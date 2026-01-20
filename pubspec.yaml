@@ -1,0 +1,71 @@
+name: gestor_vehiculos
+description: "App de gestión de vehículos para Argentina"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.10.7
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+  
+  # State management
+  flutter_riverpod: ^2.4.0
+  
+  # Database local (cache offline)
+  sqflite: ^2.3.0
+  path_provider: ^2.1.0
+  path: ^1.8.0
+  
+  # Supabase (backend)
+  supabase_flutter: ^2.3.0
+  
+  # Cloudinary (imagenes)
+  cloudinary_public: ^0.23.1
+  
+  # Imagenes
+  image_picker: ^1.0.0
+  cached_network_image: ^3.3.0
+  
+  # Navegación
+  go_router: ^12.0.0
+  
+  # Llamadas y WhatsApp
+  url_launcher: ^6.2.0
+  
+  # Iconos SVG
+  flutter_svg: ^2.0.9
+  
+  # Formateo de fechas
+  intl: ^0.18.0
+  
+  # Exportar/Importar
+  share_plus: ^10.0.0
+  file_picker: ^8.0.0
+  
+  # Conectividad
+  connectivity_plus: ^5.0.0
+  
+  # UUID para IDs
+  uuid: ^4.2.0
+  
+  # Variables de entorno
+  flutter_dotenv: ^5.1.0
+  
+  # Contactos
+  flutter_contacts: ^1.1.7+1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  
+  assets:
+    - assets/icons/
+    - .env
