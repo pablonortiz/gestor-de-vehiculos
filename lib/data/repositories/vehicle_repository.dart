@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
-import '../database/database_helper.dart';
+import '../database/database.dart';
 import '../services/sync_service.dart';
 import '../../core/config/supabase_config.dart';
 import '../../core/constants/vehicle_constants.dart';
@@ -18,6 +18,7 @@ class VehicleRepository {
   }
 
   Future<bool> get _isOnline async {
+    if (kIsWeb) return SupabaseConfig.isConfigured;
     final result = await Connectivity().checkConnectivity();
     final isOnline = result != ConnectivityResult.none && SupabaseConfig.isConfigured;
     debugPrint('🌐 [REPO] isOnline: $isOnline (connectivity: $result, configured: ${SupabaseConfig.isConfigured})');
@@ -25,12 +26,28 @@ class VehicleRepository {
   }
 
   Future<List<Vehicle>> getAllVehicles() async {
+    // En web, obtener directamente de Supabase
+    if (kIsWeb) {
+      if (!SupabaseConfig.isConfigured) return [];
+      final data = await SupabaseConfig.client.from('vehicles').select().order('updated_at', ascending: false);
+      return (data as List).map((e) => Vehicle.fromSupabase(e)).toList();
+    }
+    
     final db = await _dbHelper.database;
     final maps = await db.query('vehicles', orderBy: 'updated_at DESC');
     return maps.map((map) => Vehicle.fromMap(map)).toList();
   }
 
   Future<List<Vehicle>> getVehiclesByProvince(int provinceId) async {
+    if (kIsWeb) {
+      if (!SupabaseConfig.isConfigured) return [];
+      final data = await SupabaseConfig.client.from('vehicles')
+          .select()
+          .eq('province_id', provinceId)
+          .order('updated_at', ascending: false);
+      return (data as List).map((e) => Vehicle.fromSupabase(e)).toList();
+    }
+    
     final db = await _dbHelper.database;
     final maps = await db.query(
       'vehicles',
@@ -42,6 +59,15 @@ class VehicleRepository {
   }
 
   Future<List<Vehicle>> getVehiclesByStatus(int statusIndex) async {
+    if (kIsWeb) {
+      if (!SupabaseConfig.isConfigured) return [];
+      final data = await SupabaseConfig.client.from('vehicles')
+          .select()
+          .eq('status', statusIndex)
+          .order('updated_at', ascending: false);
+      return (data as List).map((e) => Vehicle.fromSupabase(e)).toList();
+    }
+    
     final db = await _dbHelper.database;
     final maps = await db.query(
       'vehicles',
@@ -53,6 +79,13 @@ class VehicleRepository {
   }
 
   Future<Vehicle?> getVehicleById(String id) async {
+    if (kIsWeb) {
+      if (!SupabaseConfig.isConfigured) return null;
+      final data = await SupabaseConfig.client.from('vehicles').select().eq('id', id).maybeSingle();
+      if (data == null) return null;
+      return Vehicle.fromSupabase(data);
+    }
+    
     final db = await _dbHelper.database;
     final maps = await db.query(
       'vehicles',
@@ -64,6 +97,16 @@ class VehicleRepository {
   }
 
   Future<Vehicle?> getVehicleByPlate(String plate) async {
+    if (kIsWeb) {
+      if (!SupabaseConfig.isConfigured) return null;
+      final data = await SupabaseConfig.client.from('vehicles')
+          .select()
+          .eq('plate', plate.toUpperCase())
+          .maybeSingle();
+      if (data == null) return null;
+      return Vehicle.fromSupabase(data);
+    }
+    
     final db = await _dbHelper.database;
     final maps = await db.query(
       'vehicles',
@@ -77,9 +120,26 @@ class VehicleRepository {
   Future<String> insertVehicle(Vehicle vehicle) async {
     debugPrint('🚗 [REPO] Insertando vehículo: ${vehicle.plate}');
     
-    final db = await _dbHelper.database;
     final id = _uuid.v4();
     final newVehicle = vehicle.copyWith(id: id);
+    final historyId = _uuid.v4();
+    
+    // En web, insertar directamente en Supabase
+    if (kIsWeb) {
+      if (!SupabaseConfig.isConfigured) throw Exception('Supabase no configurado');
+      
+      await SupabaseConfig.client.from('vehicles').insert(newVehicle.toSupabase());
+      await SupabaseConfig.client.from('vehicle_history').insert({
+        'id': historyId,
+        'vehicle_id': id,
+        'field': 'created',
+        'old_value': '',
+        'new_value': 'Vehículo creado',
+      });
+      return id;
+    }
+    
+    final db = await _dbHelper.database;
     
     final map = newVehicle.toMap();
     map['plate'] = (map['plate'] as String).toUpperCase();
@@ -89,7 +149,6 @@ class VehicleRepository {
     debugPrint('✅ [REPO] Vehículo guardado localmente con ID: $id');
     
     // Registrar en historial como creación
-    final historyId = _uuid.v4();
     await _insertHistory(VehicleHistory(
       id: historyId,
       vehicleId: id,

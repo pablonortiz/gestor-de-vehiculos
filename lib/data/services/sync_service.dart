@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/config/supabase_config.dart';
-import '../database/database_helper.dart';
+import '../database/database.dart';
 import '../../domain/models/vehicle.dart';
 import '../../domain/models/vehicle_history.dart';
 import '../../domain/models/maintenance.dart';

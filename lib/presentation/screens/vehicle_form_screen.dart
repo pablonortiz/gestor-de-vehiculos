@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -444,11 +445,13 @@ class _VehicleFormScreenState extends ConsumerState<VehicleFormScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const _SectionLabel(label: 'Responsable'),
-                        TextButton.icon(
-                          onPressed: _pickContact,
-                          icon: const Icon(Icons.contacts, size: 18),
-                          label: const Text('Importar contacto'),
-                        ),
+                        // El selector de contactos solo está disponible en móvil
+                        if (!kIsWeb)
+                          TextButton.icon(
+                            onPressed: _pickContact,
+                            icon: const Icon(Icons.contacts, size: 18),
+                            label: const Text('Importar contacto'),
+                          ),
                       ],
                     ),
                     const SizedBox(height: 12),
