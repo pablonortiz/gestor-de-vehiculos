@@ -1,9 +1,5 @@
-import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:intl/intl.dart';
 import '../../core/config/supabase_config.dart';
 import '../../core/theme/app_theme.dart';
@@ -18,7 +14,6 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  bool _isExporting = false;
   bool _isSyncing = false;
 
   @override
@@ -201,33 +196,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           const SizedBox(height: 32),
 
-          // Sección Datos
-          const Text(
-            'Datos',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: AppTheme.accentPrimary,
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          // Exportar
-          _SettingsTile(
-            icon: Icons.upload_file,
-            title: 'Exportar datos',
-            subtitle: 'Guardar todos los vehículos en un archivo JSON',
-            trailing: _isExporting
-                ? const SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.chevron_right, color: AppTheme.textSecondary),
-            onTap: _isExporting ? null : _exportData,
-          ),
-          const SizedBox(height: 32),
-
           // Sección Info
           const Text(
             'Información',
@@ -278,72 +246,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     } finally {
       if (mounted) {
         setState(() => _isSyncing = false);
-      }
-    }
-  }
-
-  Future<void> _exportData() async {
-    setState(() => _isExporting = true);
-
-    try {
-      final repository = ref.read(vehicleRepositoryProvider);
-      
-      // Obtener todos los datos
-      final vehicles = await repository.getAllVehicles();
-      final history = await repository.getAllHistory();
-
-      if (vehicles.isEmpty) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No hay vehículos para exportar')),
-          );
-        }
-        return;
-      }
-
-      // Crear JSON
-      final exportData = {
-        'version': 2,
-        'exportedAt': DateTime.now().toIso8601String(),
-        'vehicles': vehicles.map((v) => v.toJson()).toList(),
-        'history': history.map((h) => h.toJson()).toList(),
-      };
-
-      final jsonString = const JsonEncoder.withIndent('  ').convert(exportData);
-
-      // Guardar archivo temporal
-      final tempDir = await getTemporaryDirectory();
-      final timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
-      final file = File('${tempDir.path}/vehiculos_$timestamp.json');
-      await file.writeAsString(jsonString);
-
-      // Compartir
-      await Share.shareXFiles(
-        [XFile(file.path)],
-        subject: 'Backup de Vehículos',
-        text: 'Exportación de ${vehicles.length} vehículos',
-      );
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${vehicles.length} vehículos exportados'),
-            backgroundColor: AppTheme.success,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error al exportar: $e'),
-            backgroundColor: AppTheme.error,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isExporting = false);
       }
     }
   }

@@ -11,6 +11,7 @@ import '../../core/constants/provinces.dart';
 import '../../core/constants/vehicle_constants.dart';
 import '../../core/theme/app_theme.dart';
 import '../../domain/models/maintenance.dart';
+import '../../domain/models/vehicle.dart';
 import '../../domain/models/vehicle_note.dart';
 import '../../domain/models/vehicle_photo.dart';
 import '../../domain/models/document_photo.dart';
@@ -19,6 +20,7 @@ import '../../data/repositories/note_repository.dart';
 import '../../data/repositories/photo_repository.dart';
 import '../../data/repositories/document_photo_repository.dart';
 import '../../data/services/cloudinary_service.dart';
+import '../../data/services/pdf_service.dart';
 import '../providers/vehicle_provider.dart';
 import '../widgets/vehicle_icon.dart';
 
@@ -91,6 +93,18 @@ class VehicleDetailScreen extends ConsumerWidget {
                   ],
                 ),
                 actions: [
+                  IconButton(
+                    onPressed: () => _exportPdf(
+                      context,
+                      ref,
+                      vehicle,
+                      photosAsync.valueOrNull ?? [],
+                      documentPhotosAsync.valueOrNull ?? [],
+                      maintenancesAsync.valueOrNull ?? [],
+                    ),
+                    icon: const Icon(Icons.picture_as_pdf),
+                    tooltip: 'Exportar PDF',
+                  ),
                   IconButton(
                     onPressed: () => context.push('/vehicle/$vehicleId/history'),
                     icon: const Icon(Icons.history),
@@ -2248,6 +2262,81 @@ Future<void> _openFileUrl(BuildContext context, String url, bool isPdf) async {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: $e'), backgroundColor: AppTheme.error),
+      );
+    }
+  }
+}
+
+// Exportar vehículo a PDF
+Future<void> _exportPdf(
+  BuildContext context,
+  WidgetRef ref,
+  Vehicle vehicle,
+  List<VehiclePhoto> photos,
+  List<DocumentPhoto> documentPhotos,
+  List<Maintenance> maintenances,
+) async {
+  // Mostrar diálogo de progreso
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (ctx) => AlertDialog(
+      backgroundColor: AppTheme.surface,
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const CircularProgressIndicator(),
+          const SizedBox(height: 20),
+          const Text(
+            'Generando PDF...',
+            style: TextStyle(color: AppTheme.textPrimary),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Descargando imágenes y creando documento',
+            style: TextStyle(
+              fontSize: 12,
+              color: AppTheme.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+
+  try {
+    final pdfBytes = await PdfService.generateVehiclePdf(
+      vehicle: vehicle,
+      photos: photos,
+      documentPhotos: documentPhotos,
+      maintenances: maintenances,
+    );
+
+    // Cerrar diálogo de progreso
+    if (context.mounted) {
+      Navigator.pop(context);
+    }
+
+    // Compartir/guardar PDF
+    await PdfService.sharePdf(pdfBytes, vehicle.plate);
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('PDF generado exitosamente'),
+          backgroundColor: AppTheme.success,
+        ),
+      );
+    }
+  } catch (e) {
+    // Cerrar diálogo de progreso si aún está abierto
+    if (context.mounted) {
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al generar PDF: $e'),
+          backgroundColor: AppTheme.error,
+        ),
       );
     }
   }
