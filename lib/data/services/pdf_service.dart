@@ -142,10 +142,9 @@ class PdfService {
                         color: _primaryColor,
                         borderRadius: pw.BorderRadius.circular(8),
                       ),
-                      child: pw.Icon(
-                        pw.IconData(0xe531), // car icon
-                        color: PdfColors.white,
-                        size: 32,
+                      child: pw.Text(
+                        '🚗',
+                        style: const pw.TextStyle(fontSize: 24),
                       ),
                     ),
                     pw.SizedBox(width: 16),
@@ -379,10 +378,9 @@ class PdfService {
                         color: _primaryColor,
                         borderRadius: pw.BorderRadius.circular(8),
                       ),
-                      child: pw.Icon(
-                        pw.IconData(0xe8e8), // build icon
-                        color: PdfColors.white,
-                        size: 28,
+                      child: pw.Text(
+                        '🔧',
+                        style: const pw.TextStyle(fontSize: 20),
                       ),
                     ),
                     pw.SizedBox(width: 16),
