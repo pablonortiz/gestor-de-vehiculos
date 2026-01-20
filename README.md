@@ -58,10 +58,13 @@ Aplicación multiplataforma para la gestión integral de flotas de vehículos. D
 - **Pull-to-refresh:** Sincronización manual
 - **Sync automático:** Al recuperar conexión
 
-### 📤 Exportar/Importar
-- Exportar todos los datos en formato JSON
-- Importar datos desde archivo JSON
-- Compartir archivo de backup
+### 📄 Exportar a PDF
+- Exportar vehículo completo a PDF profesional
+- Incluye datos del vehículo, fotos, documentación y mantenimientos
+- Cada sección con página de título separadora
+- Imágenes a página completa para mejor visualización
+- Diseño oscuro acorde al tema de la app
+- Compartir o guardar el PDF generado
 
 ## 🛠️ Tecnologías
 
@@ -73,6 +76,7 @@ Aplicación multiplataforma para la gestión integral de flotas de vehículos. D
 | **Supabase** | Backend (PostgreSQL + Auth + Storage) |
 | **SQLite** | Cache local (móvil) |
 | **Cloudinary** | Almacenamiento de imágenes |
+| **PDF/Printing** | Generación de PDFs |
 
 ## 📦 Instalación
 
