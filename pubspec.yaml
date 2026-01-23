@@ -9,6 +9,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
 
   cupertino_icons: ^1.0.8
   
@@ -40,7 +42,7 @@ dependencies:
   flutter_svg: ^2.0.9
   
   # Formateo de fechas
-  intl: ^0.18.0
+  intl: ^0.20.2
   
   # Exportar/Importar
   share_plus: ^10.0.0

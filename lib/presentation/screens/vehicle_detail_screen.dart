@@ -21,6 +21,7 @@ import '../../data/repositories/photo_repository.dart';
 import '../../data/repositories/document_photo_repository.dart';
 import '../../data/services/cloudinary_service.dart';
 import '../../data/services/pdf_service.dart';
+import '../../data/services/sync_service.dart';
 import '../providers/vehicle_provider.dart';
 import '../widgets/vehicle_icon.dart';
 
@@ -31,6 +32,17 @@ class VehicleDetailScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Escuchar cambios en el estado de sincronización para refrescar las fotos
+    ref.listen<SyncState>(syncServiceProvider, (previous, next) {
+      if (previous?.status == SyncStatus.syncing && next.status == SyncStatus.success) {
+        // Invalidar providers de fotos cuando la sincronización completa
+        ref.invalidate(photosByVehicleProvider(vehicleId));
+        ref.invalidate(documentPhotosByVehicleProvider(vehicleId));
+        ref.invalidate(maintenancesByVehicleProvider(vehicleId));
+        ref.invalidate(notesByVehicleProvider(vehicleId));
+      }
+    });
+
     final vehicleAsync = ref.watch(vehicleByIdProvider(vehicleId));
     final maintenancesAsync = ref.watch(maintenancesByVehicleProvider(vehicleId));
     final notesAsync = ref.watch(notesByVehicleProvider(vehicleId));

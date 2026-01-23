@@ -17,6 +17,18 @@ class HomeScreen extends ConsumerWidget {
     final expiringAsync = ref.watch(expiringDocumentsProvider);
     final syncState = ref.watch(syncServiceProvider);
 
+    // Listen for sync completion and refresh data automatically
+    ref.listen<SyncState>(syncServiceProvider, (previous, next) {
+      if (previous?.status == SyncStatus.syncing &&
+          next.status == SyncStatus.success) {
+        // Sync completed successfully - refresh all data providers
+        ref.invalidate(vehicleCountByProvinceProvider);
+        ref.invalidate(totalVehicleCountProvider);
+        ref.invalidate(expiringDocumentsProvider);
+        ref.invalidate(vehicleNotifierProvider);
+      }
+    });
+
     return SafeArea(
       child: RefreshIndicator(
         onRefresh: () async {

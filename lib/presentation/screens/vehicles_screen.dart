@@ -44,6 +44,15 @@ class _VehiclesScreenState extends ConsumerState<VehiclesScreen> {
     final selectedProvince = ref.watch(selectedProvinceProvider);
     final vehiclesAsync = ref.watch(vehiclesBySelectedProvinceProvider);
 
+    // Listen for sync completion and refresh data automatically
+    ref.listen<SyncState>(syncServiceProvider, (previous, next) {
+      if (previous?.status == SyncStatus.syncing &&
+          next.status == SyncStatus.success) {
+        ref.invalidate(vehiclesBySelectedProvinceProvider);
+        ref.invalidate(vehicleNotifierProvider);
+      }
+    });
+
     return SafeArea(
       child: Column(
         children: [
