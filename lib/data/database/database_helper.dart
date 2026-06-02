@@ -20,9 +20,16 @@ class DatabaseHelper {
     return await openDatabase(
       path,
       version: 5,
+      onConfigure: _onConfigure,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
+  }
+
+  // Activar foreign keys: sqflite las tiene desactivadas por defecto en cada
+  // conexión, por lo que los ON DELETE CASCADE del schema no se aplican sin esto.
+  Future<void> _onConfigure(Database db) async {
+    await db.execute('PRAGMA foreign_keys = ON');
   }
 
   Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
@@ -356,21 +363,56 @@ class DatabaseHelper {
     db.close();
   }
 
-  // Limpiar todas las tablas (para sincronización completa)
-  Future<void> clearAllTables() async {
+  // Orden de borrado: hijos antes que padres (respeta las FKs con CASCADE).
+  static const _deleteOrder = [
+    'fuel_charges',
+    'document_photos',
+    'note_photos',
+    'vehicle_notes',
+    'maintenance_invoices',
+    'maintenances',
+    'vehicle_photos',
+    'vehicle_history',
+    'vehicles',
+    'lugares',
+    'cities',
+  ];
+
+  // Orden de inserción: padres antes que hijos (respeta las FKs).
+  static const _insertOrder = [
+    'cities',
+    'lugares',
+    'vehicles',
+    'vehicle_history',
+    'maintenances',
+    'maintenance_invoices',
+    'vehicle_notes',
+    'note_photos',
+    'vehicle_photos',
+    'document_photos',
+    'fuel_charges',
+  ];
+
+  // Reemplaza atómicamente toda la cache local con los datos descargados de
+  // Supabase. Borra y reinserta dentro de una única transacción, de modo que un
+  // fallo a mitad de camino no deja la cache vacía/parcial. NO toca sync_queue:
+  // esa cola es estado pendiente de subida, no cache de Supabase.
+  Future<void> replaceAllData(
+    Map<String, List<Map<String, dynamic>>> tableData,
+  ) async {
     final db = await database;
-    await db.delete('sync_queue');
-    await db.delete('fuel_charges');
-    await db.delete('document_photos');
-    await db.delete('note_photos');
-    await db.delete('vehicle_notes');
-    await db.delete('maintenance_invoices');
-    await db.delete('maintenances');
-    await db.delete('vehicle_photos');
-    await db.delete('vehicle_history');
-    await db.delete('vehicles');
-    await db.delete('lugares');
-    await db.delete('cities');
+    await db.transaction((txn) async {
+      for (final table in _deleteOrder) {
+        await txn.delete(table);
+      }
+      final batch = txn.batch();
+      for (final table in _insertOrder) {
+        for (final row in tableData[table] ?? const []) {
+          batch.insert(table, {...row, 'synced': 1});
+        }
+      }
+      await batch.commit(noResult: true);
+    });
   }
 
   // Método para reiniciar la base de datos

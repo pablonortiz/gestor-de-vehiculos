@@ -60,8 +60,15 @@ class SyncService extends StateNotifier<SyncState> {
 
   // Sincronización completa desde Supabase
   Future<void> fullSync() async {
+    // Guard de re-entrada: fullSync se dispara en initState y en cada cambio
+    // realtime de Supabase, por lo que es fácil que se solapen dos corridas.
+    // Como borra y reescribe la cache, dos en paralelo la dejarían inconsistente.
+    if (state.status == SyncStatus.syncing) {
+      debugPrint('⏭️ [SYNC] fullSync ya en curso, se omite esta invocación');
+      return;
+    }
     debugPrint('🔄 [SYNC] Iniciando fullSync...');
-    
+
     if (!await isOnline) {
       debugPrint('❌ [SYNC] Sin conexión a internet');
       state = state.copyWith(status: SyncStatus.offline, message: 'Sin conexión');
@@ -78,127 +85,67 @@ class SyncService extends StateNotifier<SyncState> {
 
     try {
       final client = SupabaseConfig.client;
-      final db = await _db.database;
 
       // PRIMERO: Subir datos locales no sincronizados a Supabase
       debugPrint('📤 [SYNC] Subiendo datos locales no sincronizados...');
       await _uploadUnsyncedData();
-      
+
       // Procesar cola de sincronización pendiente
       debugPrint('📤 [SYNC] Procesando cola de sincronización...');
       await _processSyncQueue();
 
-      // AHORA: Descargar datos de Supabase (sin borrar antes)
-      debugPrint('📥 [SYNC] Descargando vehículos de Supabase...');
-      final vehiclesData = await client.from('vehicles').select();
-      debugPrint('📥 [SYNC] Recibidos ${vehiclesData.length} vehículos de Supabase');
-      
-      // Solo limpiar y reemplazar si la descarga fue exitosa
-      if (vehiclesData is List) {
-        // Limpiar tablas locales
-        await _db.clearAllTables();
-        debugPrint('🗑️ [SYNC] Tablas locales limpiadas');
+      // AHORA: Descargar TODO de Supabase a memoria ANTES de tocar la DB local.
+      // Si una query "core" falla, se lanza la excepción y se aborta sin haber
+      // modificado la cache (el reemplazo es atómico más abajo).
+      debugPrint('📥 [SYNC] Descargando datos de Supabase...');
 
-        // Descargar ciudades primero (antes de vehículos por la FK)
+      Future<List<Map<String, dynamic>>> fetch(String table) async {
+        final data = await client.from(table).select();
+        return (data as List).cast<Map<String, dynamic>>();
+      }
+      // Tablas que pueden no existir todavía en algunos entornos: se toleran vacías.
+      Future<List<Map<String, dynamic>>> fetchOptional(String table) async {
         try {
-          final citiesData = await client.from('cities').select();
-          for (final data in citiesData) {
-            final city = City.fromSupabase(data);
-            await db.insert('cities', {...city.toMap(), 'synced': 1});
-          }
-          debugPrint('✅ [SYNC] ${citiesData.length} ciudades guardadas localmente');
+          return await fetch(table);
         } catch (e) {
-          debugPrint('⚠️ [SYNC] Tabla cities no existe aún: $e');
-        }
-
-        // Descargar lugares
-        try {
-          final lugaresData = await client.from('lugares').select();
-          for (final data in lugaresData) {
-            final lugar = Lugar.fromSupabase(data);
-            await db.insert('lugares', {...lugar.toMap(), 'synced': 1});
-          }
-          debugPrint('✅ [SYNC] ${lugaresData.length} lugares guardados localmente');
-        } catch (e) {
-          debugPrint('⚠️ [SYNC] Tabla lugares no existe aún: $e');
-        }
-
-        // Descargar vehículos
-        for (final data in vehiclesData) {
-          final vehicle = Vehicle.fromSupabase(data);
-          await db.insert('vehicles', {...vehicle.toMap(), 'synced': 1});
-        }
-        debugPrint('✅ [SYNC] ${vehiclesData.length} vehículos guardados localmente');
-
-        // Descargar historial
-        final historyData = await client.from('vehicle_history').select();
-        for (final data in historyData) {
-          final history = VehicleHistory.fromSupabase(data);
-          await db.insert('vehicle_history', {...history.toMap(), 'synced': 1});
-        }
-        debugPrint('✅ [SYNC] ${historyData.length} registros de historial');
-
-        // Descargar mantenimientos
-        final maintenancesData = await client.from('maintenances').select();
-        for (final data in maintenancesData) {
-          final maintenance = Maintenance.fromSupabase(data);
-          await db.insert('maintenances', {...maintenance.toMap(), 'synced': 1});
-        }
-
-        // Descargar facturas de mantenimiento
-        final invoicesData = await client.from('maintenance_invoices').select();
-        for (final data in invoicesData) {
-          final invoice = MaintenanceInvoice.fromSupabase(data);
-          await db.insert('maintenance_invoices', {...invoice.toMap(), 'synced': 1});
-        }
-
-        // Descargar notas
-        final notesData = await client.from('vehicle_notes').select();
-        for (final data in notesData) {
-          final note = VehicleNote.fromSupabase(data);
-          await db.insert('vehicle_notes', {...note.toMap(), 'synced': 1});
-        }
-
-        // Descargar fotos de notas
-        final notePhotosData = await client.from('note_photos').select();
-        for (final data in notePhotosData) {
-          final photo = NotePhoto.fromSupabase(data);
-          await db.insert('note_photos', {...photo.toMap(), 'synced': 1});
-        }
-
-        // Descargar fotos de vehículos
-        final vehiclePhotosData = await client.from('vehicle_photos').select();
-        for (final data in vehiclePhotosData) {
-          final photo = VehiclePhoto.fromSupabase(data);
-          await db.insert('vehicle_photos', {...photo.toMap(), 'synced': 1});
-        }
-
-        // Descargar fotos de documentos
-        try {
-          final documentPhotosData = await client.from('document_photos').select();
-          for (final data in documentPhotosData) {
-            final photo = DocumentPhoto.fromSupabase(data);
-            await db.insert('document_photos', {...photo.toMap(), 'synced': 1});
-          }
-          debugPrint('✅ [SYNC] ${documentPhotosData.length} fotos de documentos');
-        } catch (e) {
-          debugPrint('⚠️ [SYNC] Tabla document_photos no existe aún: $e');
-        }
-
-        // Descargar cargas de combustible
-        try {
-          final fuelChargesData = await client.from('fuel_charges').select();
-          for (final data in fuelChargesData) {
-            final fuelCharge = FuelCharge.fromSupabase(data);
-            await db.insert('fuel_charges', {...fuelCharge.toMap(), 'synced': 1});
-          }
-          debugPrint('✅ [SYNC] ${fuelChargesData.length} cargas de combustible');
-        } catch (e) {
-          debugPrint('⚠️ [SYNC] Tabla fuel_charges no existe aún: $e');
+          debugPrint('⚠️ [SYNC] Tabla $table no disponible: $e');
+          return const [];
         }
       }
 
-      debugPrint('✅ [SYNC] Sincronización completa exitosa');
+      final raw = <String, List<Map<String, dynamic>>>{
+        'cities': await fetchOptional('cities'),
+        'lugares': await fetchOptional('lugares'),
+        'vehicles': await fetch('vehicles'),
+        'vehicle_history': await fetch('vehicle_history'),
+        'maintenances': await fetch('maintenances'),
+        'maintenance_invoices': await fetch('maintenance_invoices'),
+        'vehicle_notes': await fetch('vehicle_notes'),
+        'note_photos': await fetch('note_photos'),
+        'vehicle_photos': await fetch('vehicle_photos'),
+        'document_photos': await fetchOptional('document_photos'),
+        'fuel_charges': await fetchOptional('fuel_charges'),
+      };
+      debugPrint('📥 [SYNC] Recibidos ${raw['vehicles']!.length} vehículos de Supabase');
+
+      // Normalizar shape Supabase → local vía los modelos.
+      final data = <String, List<Map<String, dynamic>>>{
+        'cities': [for (final d in raw['cities']!) City.fromSupabase(d).toMap()],
+        'lugares': [for (final d in raw['lugares']!) Lugar.fromSupabase(d).toMap()],
+        'vehicles': [for (final d in raw['vehicles']!) Vehicle.fromSupabase(d).toMap()],
+        'vehicle_history': [for (final d in raw['vehicle_history']!) VehicleHistory.fromSupabase(d).toMap()],
+        'maintenances': [for (final d in raw['maintenances']!) Maintenance.fromSupabase(d).toMap()],
+        'maintenance_invoices': [for (final d in raw['maintenance_invoices']!) MaintenanceInvoice.fromSupabase(d).toMap()],
+        'vehicle_notes': [for (final d in raw['vehicle_notes']!) VehicleNote.fromSupabase(d).toMap()],
+        'note_photos': [for (final d in raw['note_photos']!) NotePhoto.fromSupabase(d).toMap()],
+        'vehicle_photos': [for (final d in raw['vehicle_photos']!) VehiclePhoto.fromSupabase(d).toMap()],
+        'document_photos': [for (final d in raw['document_photos']!) DocumentPhoto.fromSupabase(d).toMap()],
+        'fuel_charges': [for (final d in raw['fuel_charges']!) FuelCharge.fromSupabase(d).toMap()],
+      };
+
+      // Reemplazo atómico (borra + reinserta en una transacción, sin tocar sync_queue).
+      await _db.replaceAllData(data);
+      debugPrint('✅ [SYNC] Cache local reemplazada atómicamente');
 
       // Notify all tables that data may have changed
       DbChangeService.instance.notifyChange('vehicles');
@@ -379,8 +326,23 @@ class SyncService extends StateNotifier<SyncState> {
     }
   }
 
+  // Lock para serializar el procesamiento de la cola: addToSyncQueue puede
+  // dispararlo desde varios repos casi a la vez, y dos pasadas concurrentes
+  // sobre la misma cola intentarían procesar/borrar los mismos items.
+  bool _isProcessingQueue = false;
+
   // Procesar cola de sincronización pendiente
   Future<void> _processSyncQueue() async {
+    if (_isProcessingQueue) return;
+    _isProcessingQueue = true;
+    try {
+      await _drainSyncQueue();
+    } finally {
+      _isProcessingQueue = false;
+    }
+  }
+
+  Future<void> _drainSyncQueue() async {
     final db = await _db.database;
     final queue = await db.query('sync_queue', orderBy: 'created_at ASC');
 
@@ -412,7 +374,12 @@ class SyncService extends StateNotifier<SyncState> {
         // Incrementar retry count
         final retryCount = (item['retry_count'] as int) + 1;
         if (retryCount >= 5) {
-          // Eliminar después de 5 intentos
+          // Eliminar después de 5 intentos, dejando rastro de la operación
+          // descartada (pérdida de dato silenciosa de lo contrario).
+          debugPrint(
+            '⚠️ [SYNC] Operación descartada tras 5 reintentos: '
+            '${item['operation']} ${item['table_name']} #${item['record_id']} — error: $e',
+          );
           await db.delete('sync_queue', where: 'id = ?', whereArgs: [item['id']]);
         } else {
           await db.update(
