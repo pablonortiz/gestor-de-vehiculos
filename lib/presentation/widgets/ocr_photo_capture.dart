@@ -53,8 +53,6 @@ class OcrPhotoCapture extends StatefulWidget {
 
 class _OcrPhotoCaptureState extends State<OcrPhotoCapture> {
   String? _photoUrl;
-  String? _publicId;
-  String? _localFilePath;
   String? _ocrText;
   bool _isProcessing = false;
   bool _ocrDetected = false;
@@ -326,30 +324,40 @@ class _OcrPhotoCaptureState extends State<OcrPhotoCapture> {
       }
 
       final file = File(pickedFile.path);
-      _localFilePath = pickedFile.path;
 
-      // Perform OCR
-      final ocrService = OcrService.instance;
-      final ocrResult = widget.type == OcrPhotoType.receipt
-          ? await ocrService.extractPrice(file)
-          : await ocrService.extractLiters(file);
+      OcrResult ocrResult;
+      CloudinaryUploadResult? uploadResult;
+      try {
+        // Perform OCR
+        final ocrService = OcrService.instance;
+        ocrResult = widget.type == OcrPhotoType.receipt
+            ? await ocrService.extractPrice(file)
+            : await ocrService.extractLiters(file);
 
-      // Upload to Cloudinary
-      final cloudinary = CloudinaryService.instance;
-      final uploadResult = await cloudinary.uploadFile(file);
+        // Upload to Cloudinary
+        final cloudinary = CloudinaryService.instance;
+        uploadResult = await cloudinary.uploadFile(file);
+      } finally {
+        // Clean up the temp file created by image_picker after uploading.
+        try {
+          await file.delete();
+        } catch (_) {
+          // File may already be gone; ignore.
+        }
+      }
 
       if (uploadResult != null) {
+        final upload = uploadResult;
         setState(() {
-          _photoUrl = uploadResult.url;
-          _publicId = uploadResult.publicId;
+          _photoUrl = upload.url;
           _ocrText = ocrResult.fullText;
           _ocrDetected = ocrResult.success;
           _isProcessing = false;
         });
 
         widget.onPhotoResult(OcrPhotoResult(
-          cloudinaryUrl: uploadResult.url,
-          cloudinaryPublicId: uploadResult.publicId,
+          cloudinaryUrl: upload.url,
+          cloudinaryPublicId: upload.publicId,
           extractedValue: ocrResult.value,
           ocrDetected: ocrResult.success,
           ocrText: ocrResult.fullText,
@@ -409,30 +417,41 @@ class _OcrPhotoCaptureState extends State<OcrPhotoCapture> {
 
       final file = result.files.first;
       final isPdf = file.extension?.toLowerCase() == 'pdf';
+      final localFile = File(file.path!);
 
-      final cloudinary = CloudinaryService.instance;
-      final uploadResult = await cloudinary.uploadFile(
-        File(file.path!),
-        isPdf: isPdf,
-        fileName: file.name,
-      );
+      CloudinaryUploadResult? uploadResult;
+      try {
+        final cloudinary = CloudinaryService.instance;
+        uploadResult = await cloudinary.uploadFile(
+          localFile,
+          isPdf: isPdf,
+          fileName: file.name,
+        );
+      } finally {
+        // Clean up the temp file copied by file_picker after uploading.
+        try {
+          await localFile.delete();
+        } catch (_) {
+          // File may already be gone; ignore.
+        }
+      }
 
       if (uploadResult != null) {
+        final upload = uploadResult;
         setState(() {
-          _photoUrl = uploadResult.url;
-          _publicId = uploadResult.publicId;
-          _isPdf = uploadResult.isPdf;
-          _fileName = uploadResult.fileName;
+          _photoUrl = upload.url;
+          _isPdf = upload.isPdf;
+          _fileName = upload.fileName;
           _ocrText = null;
           _ocrDetected = false;
           _isProcessing = false;
         });
 
         widget.onPhotoResult(OcrPhotoResult(
-          cloudinaryUrl: uploadResult.url,
-          cloudinaryPublicId: uploadResult.publicId,
-          isPdf: uploadResult.isPdf,
-          fileName: uploadResult.fileName,
+          cloudinaryUrl: upload.url,
+          cloudinaryPublicId: upload.publicId,
+          isPdf: upload.isPdf,
+          fileName: upload.fileName,
         ));
       } else {
         setState(() => _isProcessing = false);
@@ -455,8 +474,6 @@ class _OcrPhotoCaptureState extends State<OcrPhotoCapture> {
   void _removePhoto() {
     setState(() {
       _photoUrl = null;
-      _publicId = null;
-      _localFilePath = null;
       _ocrText = null;
       _ocrDetected = false;
       _isPdf = false;

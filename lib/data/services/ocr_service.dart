@@ -55,24 +55,22 @@ class OcrService {
 
       debugPrint('OCR Text for liters (${fullText.length} chars): $fullText');
 
-      // Try different patterns for liters
-      final patterns = [
+      if (fullText.isEmpty) {
+        debugPrint('OCR: No text recognized in image');
+        return OcrResult.failure(fullText);
+      }
+
+      // Keyword-anchored patterns: high confidence, take the first match.
+      final keywordPatterns = [
         // "45.50 L" or "45,50 L"
         RegExp(r'(\d{1,3}[.,]\d{1,3})\s*[Ll](?:itros?)?', caseSensitive: false),
         // "Litros: 45.50" or "Litros 45,50"
         RegExp(r'[Ll]itros?:?\s*(\d{1,3}[.,]\d{1,3})', caseSensitive: false),
         // "Vol: 45.50" or "VOL 45,50"
         RegExp(r'[Vv][Oo][Ll](?:umen)?:?\s*(\d{1,3}[.,]\d{1,3})'),
-        // Standalone decimal number that looks like liters (typically 10-100 range)
-        RegExp(r'\b(\d{1,2}[.,]\d{1,3})\b'),
       ];
 
-      if (fullText.isEmpty) {
-        debugPrint('OCR: No text recognized in image');
-        return OcrResult.failure(fullText);
-      }
-
-      for (final pattern in patterns) {
+      for (final pattern in keywordPatterns) {
         final match = pattern.firstMatch(fullText);
         if (match != null) {
           final rawValue = match.group(1)!;
@@ -86,6 +84,40 @@ class OcrService {
             return OcrResult.found(value, rawValue, fullText);
           }
         }
+      }
+
+      // Standalone decimal fallback: scan all matches, discard date/time-looking
+      // values, and pick the most plausible liters reading.
+      final standalonePattern = RegExp(r'\b(\d{1,2}[.,]\d{1,3})\b');
+      // Matches dd.mm / hh.mm style tokens (e.g. "12.05", "08.30").
+      final dateTimeLike = RegExp(r'^([0-2]?\d|3[01])[.,][0-5]\d$');
+
+      String? bestRaw;
+      double? bestValue;
+      for (final match in standalonePattern.allMatches(fullText)) {
+        final rawValue = match.group(1)!;
+        if (dateTimeLike.hasMatch(rawValue)) {
+          debugPrint('OCR: Skipping date/time-like value "$rawValue"');
+          continue;
+        }
+        final value = double.tryParse(rawValue.replaceAll(',', '.'));
+        if (value == null || value <= 0 || value > 200) continue;
+
+        // Prefer values in the typical refuel range (10-100 L); among those,
+        // keep the largest. If none qualify, fall back to the largest valid.
+        final candidateInRange = value >= 10 && value <= 100;
+        final bestInRange = bestValue != null && bestValue >= 10 && bestValue <= 100;
+        if (bestValue == null ||
+            (candidateInRange && !bestInRange) ||
+            (candidateInRange == bestInRange && value > bestValue)) {
+          bestValue = value;
+          bestRaw = rawValue;
+        }
+      }
+
+      if (bestValue != null && bestRaw != null) {
+        debugPrint('OCR: Liters extracted (standalone): $bestValue from "$bestRaw"');
+        return OcrResult.found(bestValue, bestRaw, fullText);
       }
 
       debugPrint('OCR: No valid liters pattern found in text');
@@ -120,8 +152,9 @@ class OcrService {
         return OcrResult.failure(fullText);
       }
 
-      // Try different patterns for Argentine prices
-      final patterns = [
+      // Keyword/$-anchored patterns for Argentine prices: high confidence,
+      // take the first match.
+      final keywordPatterns = [
         // "Total: $45.000,50" or "TOTAL $45.000,50"
         RegExp(r'[Tt][Oo][Tt][Aa][Ll]:?\s*\$?\s*([\d.,]+)'),
         // "Importe: $45.000,50" or "IMPORTE 45.000,50"
@@ -130,11 +163,9 @@ class OcrService {
         RegExp(r'[Pp]agar:?\s*\$?\s*([\d.,]+)'),
         // "$45.000,50" - any price with $ sign
         RegExp(r'\$\s*([\d.,]+)'),
-        // Large number that looks like a price (4+ digits)
-        RegExp(r'\b(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{2})?)\b'),
       ];
 
-      for (final pattern in patterns) {
+      for (final pattern in keywordPatterns) {
         final match = pattern.firstMatch(fullText);
         if (match != null) {
           final rawValue = match.group(1)!;
@@ -147,6 +178,29 @@ class OcrService {
             return OcrResult.found(value, rawValue, fullText);
           }
         }
+      }
+
+      // Standalone number fallback: scan all candidates and pick the largest
+      // plausible value, since the total is typically the biggest figure on
+      // the ticket (avoids grabbing the first number like a date or CUIT).
+      final standalonePattern =
+          RegExp(r'\b(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{2})?)\b');
+
+      String? bestRaw;
+      double? bestValue;
+      for (final match in standalonePattern.allMatches(fullText)) {
+        final rawValue = match.group(1)!;
+        final value = _parseArgentinePrice(rawValue);
+        if (value == null || value <= 100) continue;
+        if (bestValue == null || value > bestValue) {
+          bestValue = value;
+          bestRaw = rawValue;
+        }
+      }
+
+      if (bestValue != null && bestRaw != null) {
+        debugPrint('OCR: Price extracted (standalone): $bestValue from "$bestRaw"');
+        return OcrResult.found(bestValue, bestRaw, fullText);
       }
 
       debugPrint('OCR: No valid price pattern found in text');
