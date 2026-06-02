@@ -46,55 +46,48 @@ class PhotoRepository with SyncableRepository {
   Future<String> insertPhoto(VehiclePhoto photo) async {
     final db = await _dbHelper.database;
     final id = _uuid.v4();
-    
-    // Si es la primera foto o está marcada como principal, desmarcar las demás
-    if (photo.isPrimary) {
-      await db.update(
-        'vehicle_photos',
-        {'is_primary': 0},
-        where: 'vehicle_id = ?',
-        whereArgs: [photo.vehicleId],
-      );
-    }
-    
-    // Verificar si es la primera foto
+
     final existingPhotos = await getPhotosByVehicle(photo.vehicleId);
-    final isPrimary = existingPhotos.isEmpty ? true : photo.isPrimary;
-    
+    final shouldBePrimary = existingPhotos.isEmpty || photo.isPrimary;
+    // Insertamos como primaria SOLO si es la primera foto (no hay otra que
+    // desmarcar). Si hay otras y debe ser primaria, lo resuelve setPrimaryPhoto
+    // más abajo, que marca synced=0 y encola el unset de la primaria anterior
+    // (offline-safe). Así evitamos dejar dos primarias tras un fullSync.
+    final insertAsPrimary = existingPhotos.isEmpty;
+
     final newPhoto = VehiclePhoto(
       id: id,
       vehicleId: photo.vehicleId,
       cloudinaryUrl: photo.cloudinaryUrl,
       cloudinaryPublicId: photo.cloudinaryPublicId,
-      isPrimary: isPrimary,
+      isPrimary: insertAsPrimary,
       isPdf: photo.isPdf,
       fileName: photo.fileName,
     );
-    
+
     final map = newPhoto.toMap();
     map['synced'] = 0;
-    
+
     await db.insert('vehicle_photos', map);
-    
-    // Sincronizar con Supabase
+
+    // Sincronizar el INSERT de la foto nueva.
     await pushWrite(
       table: 'vehicle_photos',
       recordId: id,
       operation: 'insert',
       data: newPhoto.toSupabase(),
       remoteOp: () async {
-        if (isPrimary) {
-          await SupabaseConfig.client
-              .from('vehicle_photos')
-              .update({'is_primary': false})
-              .eq('vehicle_id', photo.vehicleId);
-        }
         await SupabaseConfig.client.from('vehicle_photos').insert(newPhoto.toSupabase());
       },
       markSynced: () async {
         await db.update('vehicle_photos', {'synced': 1}, where: 'id = ?', whereArgs: [id]);
       },
     );
+
+    // Promover a primaria correctamente si corresponde y había otras fotos.
+    if (shouldBePrimary && existingPhotos.isNotEmpty) {
+      await setPrimaryPhoto(id, photo.vehicleId);
+    }
 
     DbChangeService.instance.notifyChange('vehicle_photos');
     return id;
