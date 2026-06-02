@@ -32,7 +32,6 @@ class CityAutocomplete extends ConsumerStatefulWidget {
 }
 
 class CityAutocompleteState extends ConsumerState<CityAutocomplete> {
-  City? _selectedCity;
   bool _matchesExisting = false;
 
   @override
@@ -46,11 +45,16 @@ class CityAutocompleteState extends ConsumerState<CityAutocomplete> {
     }
   }
 
+  @override
+  void dispose() {
+    widget.controller.removeListener(_checkMatch);
+    super.dispose();
+  }
+
   Future<void> _loadInitialCity() async {
     final cityAsync = await ref.read(cityByIdProvider(widget.initialCityId!).future);
     if (cityAsync != null && mounted) {
       setState(() {
-        _selectedCity = cityAsync;
         _matchesExisting = true;
       });
     }
@@ -70,9 +74,6 @@ class CityAutocompleteState extends ConsumerState<CityAutocomplete> {
       if (mounted) {
         setState(() {
           _matchesExisting = matchingCity != null;
-          if (matchingCity != null) {
-            _selectedCity = matchingCity;
-          }
         });
       }
     });
@@ -82,7 +83,6 @@ class CityAutocompleteState extends ConsumerState<CityAutocomplete> {
 
   void _onCitySelected(City city) {
     setState(() {
-      _selectedCity = city;
       _matchesExisting = true;
     });
     widget.onCitySelected?.call(city);
@@ -126,23 +126,6 @@ class CityAutocompleteState extends ConsumerState<CityAutocomplete> {
       ),
     );
   }
-
-  /// Gets the selected city or creates a new one based on text input.
-  /// Call this when saving the form.
-  Future<City?> getOrCreateCity() async {
-    if (_selectedCity != null && _matchesExisting) {
-      return _selectedCity;
-    }
-
-    final text = widget.controller.text.trim();
-    if (text.isEmpty) return null;
-
-    final repository = ref.read(locationRepositoryProvider);
-    return await repository.getOrCreateCity(widget.provinceId, text);
-  }
-
-  /// Returns the currently selected city (may be null if text doesn't match)
-  City? get selectedCity => _matchesExisting ? _selectedCity : null;
 
   /// Returns whether the current text matches an existing city
   bool get hasMatchingCity => _matchesExisting;

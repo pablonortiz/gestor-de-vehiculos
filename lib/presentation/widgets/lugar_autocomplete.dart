@@ -36,7 +36,6 @@ class LugarAutocomplete extends ConsumerStatefulWidget {
 }
 
 class LugarAutocompleteState extends ConsumerState<LugarAutocomplete> {
-  Lugar? _selectedLugar;
   bool _matchesExisting = false;
 
   @override
@@ -51,12 +50,17 @@ class LugarAutocompleteState extends ConsumerState<LugarAutocomplete> {
   }
 
   @override
+  void dispose() {
+    widget.controller.removeListener(_checkMatch);
+    super.dispose();
+  }
+
+  @override
   void didUpdateWidget(LugarAutocomplete oldWidget) {
     super.didUpdateWidget(oldWidget);
     // If city changed, clear the selection
     if (oldWidget.cityId != widget.cityId) {
       setState(() {
-        _selectedLugar = null;
         _matchesExisting = false;
       });
     }
@@ -66,7 +70,6 @@ class LugarAutocompleteState extends ConsumerState<LugarAutocomplete> {
     final lugarAsync = await ref.read(lugarByIdProvider(widget.initialLugarId!).future);
     if (lugarAsync != null && mounted) {
       setState(() {
-        _selectedLugar = lugarAsync;
         _matchesExisting = true;
       });
     }
@@ -76,7 +79,6 @@ class LugarAutocompleteState extends ConsumerState<LugarAutocomplete> {
     if (widget.cityId == null) {
       setState(() {
         _matchesExisting = false;
-        _selectedLugar = null;
       });
       return;
     }
@@ -94,9 +96,6 @@ class LugarAutocompleteState extends ConsumerState<LugarAutocomplete> {
       if (mounted) {
         setState(() {
           _matchesExisting = matchingLugar != null;
-          if (matchingLugar != null) {
-            _selectedLugar = matchingLugar;
-          }
         });
       }
     });
@@ -106,7 +105,6 @@ class LugarAutocompleteState extends ConsumerState<LugarAutocomplete> {
 
   void _onLugarSelected(Lugar lugar) {
     setState(() {
-      _selectedLugar = lugar;
       _matchesExisting = true;
     });
     widget.onLugarSelected?.call(lugar);
@@ -183,25 +181,6 @@ class LugarAutocompleteState extends ConsumerState<LugarAutocomplete> {
       ),
     );
   }
-
-  /// Gets the selected lugar or creates a new one based on text input.
-  /// Call this when saving the form.
-  Future<Lugar?> getOrCreateLugar() async {
-    if (widget.cityId == null) return null;
-
-    final text = widget.controller.text.trim();
-    if (text.isEmpty) return null;
-
-    if (_selectedLugar != null && _matchesExisting) {
-      return _selectedLugar;
-    }
-
-    final repository = ref.read(locationRepositoryProvider);
-    return await repository.getOrCreateLugar(widget.cityId!, text);
-  }
-
-  /// Returns the currently selected lugar (may be null if text doesn't match or no city)
-  Lugar? get selectedLugar => _matchesExisting ? _selectedLugar : null;
 
   /// Returns whether the current text matches an existing lugar
   bool get hasMatchingLugar => _matchesExisting;
