@@ -210,6 +210,7 @@ class _PhotosSectionState extends ConsumerState<_PhotosSection> {
         }
       } else if (source == 'gallery') {
         final results = await cloudinary.uploadMultipleFromGallery();
+        if (!mounted) return;
         setState(() => _uploadTotal = results.length);
 
         for (int i = 0; i < results.length; i++) {
@@ -219,10 +220,12 @@ class _PhotosSectionState extends ConsumerState<_PhotosSection> {
             cloudinaryUrl: result.url,
             cloudinaryPublicId: result.publicId,
           ));
+          if (!mounted) return;
           setState(() => _uploadProgress = i + 1);
         }
       } else if (source == 'file') {
         final results = await cloudinary.uploadMultipleInvoices();
+        if (!mounted) return;
         setState(() => _uploadTotal = results.length);
 
         for (int i = 0; i < results.length; i++) {
@@ -234,6 +237,7 @@ class _PhotosSectionState extends ConsumerState<_PhotosSection> {
             isPdf: result.isPdf,
             fileName: result.fileName,
           ));
+          if (!mounted) return;
           setState(() => _uploadProgress = i + 1);
         }
       }

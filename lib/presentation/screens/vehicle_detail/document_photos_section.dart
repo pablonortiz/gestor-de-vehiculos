@@ -266,12 +266,23 @@ class _DocumentPhotosSectionState extends ConsumerState<_DocumentPhotosSection> 
               onTap: () async {
                 Navigator.pop(ctx);
                 final docPhotoRepo = ref.read(documentPhotoRepositoryProvider);
-                await docPhotoRepo.deletePhoto(photo.id!);
-                ref.invalidate(documentPhotosByVehicleProvider(widget.vehicleId));
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Foto eliminada')),
-                  );
+                try {
+                  await docPhotoRepo.deletePhoto(photo.id!);
+                  ref.invalidate(documentPhotosByVehicleProvider(widget.vehicleId));
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Foto eliminada')),
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Error al eliminar el documento: $e'),
+                        backgroundColor: AppTheme.error,
+                      ),
+                    );
+                  }
                 }
               },
             ),
