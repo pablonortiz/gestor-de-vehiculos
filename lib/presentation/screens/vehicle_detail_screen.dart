@@ -20,7 +20,6 @@ import '../../data/repositories/document_photo_repository.dart';
 import '../../data/services/cloudinary_service.dart';
 import 'package:printing/printing.dart';
 import '../../data/services/pdf_service.dart';
-import '../../data/services/sync_service.dart';
 import '../providers/vehicle_provider.dart';
 import '../providers/fuel_charge_provider.dart';
 import '../widgets/vehicle_icon.dart';
@@ -41,17 +40,9 @@ class VehicleDetailScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Escuchar cambios en el estado de sincronización para refrescar las fotos
-    ref.listen<SyncState>(syncServiceProvider, (previous, next) {
-      if (previous?.status == SyncStatus.syncing && next.status == SyncStatus.success) {
-        // Invalidar providers de fotos cuando la sincronización completa
-        ref.invalidate(photosByVehicleProvider(vehicleId));
-        ref.invalidate(documentPhotosByVehicleProvider(vehicleId));
-        ref.invalidate(maintenancesByVehicleProvider(vehicleId));
-        ref.invalidate(notesByVehicleProvider(vehicleId));
-        ref.invalidate(recentFuelChargesProvider(vehicleId));
-      }
-    });
+    // El refresco post-sync de fotos/documentos/mantenimientos/notas/combustible
+    // ya ocurre solo: replaceAllData emite notifyChange de esas tablas y cada
+    // provider watchea su *ChangeProvider. No hace falta invalidar manualmente.
 
     final vehicleAsync = ref.watch(vehicleByIdProvider(vehicleId));
     final maintenancesAsync = ref.watch(maintenancesByVehicleProvider(vehicleId));
@@ -319,7 +310,7 @@ class VehicleDetailScreen extends ConsumerWidget {
                                     icon: Icons.phone,
                                     label: 'Llamar',
                                     color: AppTheme.success,
-                                    onTap: () => _makePhoneCall(vehicle.responsiblePhone),
+                                    onTap: () => _makePhoneCall(context, vehicle.responsiblePhone),
                                   ),
                                 ),
                                 const SizedBox(width: 12),
@@ -516,11 +507,16 @@ class VehicleDetailScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _makePhoneCall(String phoneNumber) async {
+  Future<void> _makePhoneCall(BuildContext context, String phoneNumber) async {
+    final messenger = ScaffoldMessenger.of(context);
     final cleanNumber = phoneNumber.replaceAll(RegExp(r'[^\d+]'), '');
     final uri = Uri.parse('tel:$cleanNumber');
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri);
+    } else {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('No se pudo iniciar la llamada')),
+      );
     }
   }
 

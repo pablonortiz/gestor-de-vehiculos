@@ -46,14 +46,9 @@ class _VehiclesScreenState extends ConsumerState<VehiclesScreen> {
     final locationFilter = ref.watch(locationFilterProvider);
     final vehiclesAsync = ref.watch(vehiclesByLocationFilterProvider);
 
-    // Listen for sync completion and refresh data automatically
-    ref.listen<SyncState>(syncServiceProvider, (previous, next) {
-      if (previous?.status == SyncStatus.syncing &&
-          next.status == SyncStatus.success) {
-        ref.invalidate(vehiclesByLocationFilterProvider);
-        ref.invalidate(vehicleNotifierProvider);
-      }
-    });
+    // El refresco post-sync ya ocurre solo: replaceAllData emite notifyChange,
+    // que dispara la subscription del notifier (y vehiclesByLocationFilterProvider
+    // deriva de él). No hace falta invalidar manualmente.
 
     return SafeArea(
       child: Column(

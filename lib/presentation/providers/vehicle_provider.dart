@@ -144,12 +144,15 @@ class VehicleNotifier extends StateNotifier<AsyncValue<List<Vehicle>>> {
     _invalidateProviders();
   }
 
+  // Nota: las mutaciones no llaman loadVehicles() ni _invalidateProviders()
+  // explícitamente. El repositorio emite DbChangeService.notifyChange('vehicles')
+  // al terminar, lo que (a) dispara la subscription de este notifier → loadVehicles,
+  // y (b) refresca vehiclesProvider y los counts/expiring que watchean
+  // vehiclesChangeProvider. Una sola vía de refresco evita el doble reload.
+
   Future<String?> addVehicle(Vehicle vehicle) async {
     try {
-      final id = await _repository.insertVehicle(vehicle);
-      await loadVehicles();
-      _invalidateProviders();
-      return id;
+      return await _repository.insertVehicle(vehicle);
     } catch (e) {
       return null;
     }
@@ -158,13 +161,6 @@ class VehicleNotifier extends StateNotifier<AsyncValue<List<Vehicle>>> {
   Future<bool> updateVehicle(Vehicle vehicle) async {
     try {
       await _repository.updateVehicle(vehicle);
-      await loadVehicles();
-      _invalidateProviders();
-      // Invalidar el provider específico del vehículo actualizado
-      if (vehicle.id != null) {
-        _ref.invalidate(vehicleByIdProvider(vehicle.id!));
-        _ref.invalidate(vehicleHistoryProvider(vehicle.id!));
-      }
       return true;
     } catch (e) {
       return false;
@@ -174,10 +170,6 @@ class VehicleNotifier extends StateNotifier<AsyncValue<List<Vehicle>>> {
   Future<bool> deleteVehicle(String id) async {
     try {
       await _repository.deleteVehicle(id);
-      await loadVehicles();
-      _invalidateProviders();
-      // Invalidar el provider específico del vehículo eliminado
-      _ref.invalidate(vehicleByIdProvider(id));
       return true;
     } catch (e) {
       return false;

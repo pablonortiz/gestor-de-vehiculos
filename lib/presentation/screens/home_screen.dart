@@ -19,17 +19,8 @@ class HomeScreen extends ConsumerWidget {
     final expiringAsync = ref.watch(expiringDocumentsProvider);
     final syncState = ref.watch(syncServiceProvider);
 
-    // Listen for sync completion and refresh data automatically
-    ref.listen<SyncState>(syncServiceProvider, (previous, next) {
-      if (previous?.status == SyncStatus.syncing &&
-          next.status == SyncStatus.success) {
-        // Sync completed successfully - refresh all data providers
-        ref.invalidate(vehicleCountByProvinceProvider);
-        ref.invalidate(totalVehicleCountProvider);
-        ref.invalidate(expiringDocumentsProvider);
-        ref.invalidate(vehicleNotifierProvider);
-      }
-    });
+    // El refresco post-sync ya ocurre solo vía DbChangeService.notifyChange →
+    // los counts/total/expiring watchean vehiclesChangeProvider. Sin invalidación manual.
 
     return SafeArea(
       child: RefreshIndicator(
@@ -367,9 +358,20 @@ class HomeScreen extends ConsumerWidget {
   }
 
   void _showExpiringVehicles(BuildContext context, WidgetRef ref) {
-    final expiringAsync = ref.read(expiringDocumentsProvider);
-    
-    expiringAsync.whenData((vehicles) {
+    final vehicles = ref.read(expiringDocumentsProvider).valueOrNull;
+
+    // Si el provider aún no resolvió (loading) o quedó en error, dar feedback
+    // en vez de un tap que no hace nada.
+    if (vehicles == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Cargando documentos, probá de nuevo en un instante'),
+        ),
+      );
+      return;
+    }
+
+    {
       if (vehicles.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -438,7 +440,7 @@ class HomeScreen extends ConsumerWidget {
           ),
         ),
       );
-    });
+    }
   }
 }
 
