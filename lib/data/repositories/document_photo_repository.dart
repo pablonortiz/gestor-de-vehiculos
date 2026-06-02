@@ -1,6 +1,4 @@
-import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../database/database.dart';
 import '../services/db_change_service.dart';
@@ -8,6 +6,7 @@ import '../services/sync_service.dart';
 import '../../core/config/supabase_config.dart';
 import '../../domain/models/document_photo.dart';
 import '../../presentation/providers/db_change_provider.dart';
+import 'syncable_repository.dart';
 
 final documentPhotoRepositoryProvider = Provider<DocumentPhotoRepository>((ref) {
   final repo = DocumentPhotoRepository();
@@ -26,7 +25,7 @@ final documentPhotosByTypeProvider = FutureProvider.family<List<DocumentPhoto>, 
   return repo.getPhotosByType(params.vehicleId, params.type);
 });
 
-class DocumentPhotoRepository {
+class DocumentPhotoRepository with SyncableRepository {
   final DatabaseHelper _dbHelper = DatabaseHelper.instance;
   final _uuid = const Uuid();
   SyncService? _syncService;
@@ -35,10 +34,8 @@ class DocumentPhotoRepository {
     _syncService = syncService;
   }
 
-  Future<bool> get _isOnline async {
-    final result = await Connectivity().checkConnectivity();
-    return result != ConnectivityResult.none && SupabaseConfig.isConfigured;
-  }
+  @override
+  SyncService? get syncService => _syncService;
 
   // Obtener todas las fotos de documentos de un vehículo
   Future<List<DocumentPhoto>> getPhotosByVehicle(String vehicleId) async {
@@ -85,26 +82,18 @@ class DocumentPhotoRepository {
     await db.insert('document_photos', map);
     
     // Sincronizar con Supabase
-    if (await _isOnline) {
-      try {
+    await pushWrite(
+      table: 'document_photos',
+      recordId: id,
+      operation: 'insert',
+      data: newPhoto.toSupabase(),
+      remoteOp: () async {
         await SupabaseConfig.client.from('document_photos').insert(newPhoto.toSupabase());
+      },
+      markSynced: () async {
         await db.update('document_photos', {'synced': 1}, where: 'id = ?', whereArgs: [id]);
-      } catch (e) {
-        _syncService?.addToSyncQueue(
-          tableName: 'document_photos',
-          recordId: id,
-          operation: 'insert',
-          data: newPhoto.toSupabase(),
-        );
-      }
-    } else {
-      _syncService?.addToSyncQueue(
-        tableName: 'document_photos',
-        recordId: id,
-        operation: 'insert',
-        data: newPhoto.toSupabase(),
-      );
-    }
+      },
+    );
 
     DbChangeService.instance.notifyChange('document_photos');
     return id;
@@ -115,27 +104,17 @@ class DocumentPhotoRepository {
     final db = await _dbHelper.database;
     
     final result = await db.delete('document_photos', where: 'id = ?', whereArgs: [id]);
-    
+
     // Sincronizar con Supabase
-    if (await _isOnline) {
-      try {
+    await pushWrite(
+      table: 'document_photos',
+      recordId: id,
+      operation: 'delete',
+      data: {},
+      remoteOp: () async {
         await SupabaseConfig.client.from('document_photos').delete().eq('id', id);
-      } catch (e) {
-        _syncService?.addToSyncQueue(
-          tableName: 'document_photos',
-          recordId: id,
-          operation: 'delete',
-          data: {},
-        );
-      }
-    } else {
-      _syncService?.addToSyncQueue(
-        tableName: 'document_photos',
-        recordId: id,
-        operation: 'delete',
-        data: {},
-      );
-    }
+      },
+    );
 
     DbChangeService.instance.notifyChange('document_photos');
     return result;

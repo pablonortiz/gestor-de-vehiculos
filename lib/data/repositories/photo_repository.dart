@@ -1,13 +1,12 @@
-import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
 import '../database/database.dart';
 import '../services/db_change_service.dart';
 import '../services/sync_service.dart';
 import '../../core/config/supabase_config.dart';
 import '../../domain/models/vehicle_photo.dart';
+import 'syncable_repository.dart';
 
-class PhotoRepository {
+class PhotoRepository with SyncableRepository {
   final DatabaseHelper _dbHelper = DatabaseHelper.instance;
   final _uuid = const Uuid();
   SyncService? _syncService;
@@ -16,10 +15,8 @@ class PhotoRepository {
     _syncService = syncService;
   }
 
-  Future<bool> get _isOnline async {
-    final result = await Connectivity().checkConnectivity();
-    return result != ConnectivityResult.none && SupabaseConfig.isConfigured;
-  }
+  @override
+  SyncService? get syncService => _syncService;
 
   // Obtener fotos de un vehículo
   Future<List<VehiclePhoto>> getPhotosByVehicle(String vehicleId) async {
@@ -80,8 +77,12 @@ class PhotoRepository {
     await db.insert('vehicle_photos', map);
     
     // Sincronizar con Supabase
-    if (await _isOnline) {
-      try {
+    await pushWrite(
+      table: 'vehicle_photos',
+      recordId: id,
+      operation: 'insert',
+      data: newPhoto.toSupabase(),
+      remoteOp: () async {
         if (isPrimary) {
           await SupabaseConfig.client
               .from('vehicle_photos')
@@ -89,23 +90,11 @@ class PhotoRepository {
               .eq('vehicle_id', photo.vehicleId);
         }
         await SupabaseConfig.client.from('vehicle_photos').insert(newPhoto.toSupabase());
+      },
+      markSynced: () async {
         await db.update('vehicle_photos', {'synced': 1}, where: 'id = ?', whereArgs: [id]);
-      } catch (e) {
-        _syncService?.addToSyncQueue(
-          tableName: 'vehicle_photos',
-          recordId: id,
-          operation: 'insert',
-          data: newPhoto.toSupabase(),
-        );
-      }
-    } else {
-      _syncService?.addToSyncQueue(
-        tableName: 'vehicle_photos',
-        recordId: id,
-        operation: 'insert',
-        data: newPhoto.toSupabase(),
-      );
-    }
+      },
+    );
 
     DbChangeService.instance.notifyChange('vehicle_photos');
     return id;
@@ -114,39 +103,69 @@ class PhotoRepository {
   // Establecer foto como principal
   Future<void> setPrimaryPhoto(String photoId, String vehicleId) async {
     final db = await _dbHelper.database;
-    
-    // Desmarcar todas las fotos del vehículo
-    await db.update(
+
+    // Primaria(s) anterior(es): tocamos SOLO las fotos afectadas (la vieja
+    // primaria y la nueva), no todas las del vehículo, para no pisar el flag
+    // synced de fotos con cambios locales pendientes.
+    final prev = await db.query(
       'vehicle_photos',
-      {'is_primary': 0, 'synced': 0},
-      where: 'vehicle_id = ?',
+      columns: ['id'],
+      where: 'vehicle_id = ? AND is_primary = 1',
       whereArgs: [vehicleId],
     );
-    
-    // Marcar la foto seleccionada como principal
-    await db.update(
-      'vehicle_photos',
-      {'is_primary': 1, 'synced': 0},
-      where: 'id = ?',
-      whereArgs: [photoId],
-    );
-    
-    // Sincronizar con Supabase
-    if (await _isOnline) {
+    final prevPrimaryIds = prev.map((m) => m['id'] as String).toList();
+
+    for (final pid in prevPrimaryIds) {
+      await db.update('vehicle_photos', {'is_primary': 0, 'synced': 0},
+          where: 'id = ?', whereArgs: [pid]);
+    }
+    await db.update('vehicle_photos', {'is_primary': 1, 'synced': 0},
+        where: 'id = ?', whereArgs: [photoId]);
+
+    // IDs afectados (la nueva primaria + las que dejaron de serlo).
+    final affectedIds = <String>{...prevPrimaryIds, photoId};
+
+    Future<void> enqueuePrimaryUpdates() async {
+      for (final pid in prevPrimaryIds) {
+        await _syncService?.addToSyncQueue(
+          tableName: 'vehicle_photos',
+          recordId: pid,
+          operation: 'update',
+          data: {'is_primary': false},
+        );
+      }
+      await _syncService?.addToSyncQueue(
+        tableName: 'vehicle_photos',
+        recordId: photoId,
+        operation: 'update',
+        data: {'is_primary': true},
+      );
+    }
+
+    if (await isOnline) {
       try {
-        await SupabaseConfig.client
-            .from('vehicle_photos')
-            .update({'is_primary': false})
-            .eq('vehicle_id', vehicleId);
+        for (final pid in prevPrimaryIds) {
+          await SupabaseConfig.client
+              .from('vehicle_photos')
+              .update({'is_primary': false})
+              .eq('id', pid);
+        }
         await SupabaseConfig.client
             .from('vehicle_photos')
             .update({'is_primary': true})
             .eq('id', photoId);
-        
-        await db.update('vehicle_photos', {'synced': 1}, where: 'vehicle_id = ?', whereArgs: [vehicleId]);
+
+        // Marcar synced=1 SOLO las fotos afectadas.
+        for (final pid in affectedIds) {
+          await db.update('vehicle_photos', {'synced': 1},
+              where: 'id = ?', whereArgs: [pid]);
+        }
       } catch (e) {
-        // Se sincronizará después
+        // No tragar el error: encolar para reintento posterior.
+        await enqueuePrimaryUpdates();
       }
+    } else {
+      await enqueuePrimaryUpdates();
     }
 
     DbChangeService.instance.notifyChange('vehicle_photos');
@@ -172,25 +191,15 @@ class PhotoRepository {
     }
     
     // Sincronizar con Supabase
-    if (await _isOnline) {
-      try {
+    await pushWrite(
+      table: 'vehicle_photos',
+      recordId: id,
+      operation: 'delete',
+      data: {},
+      remoteOp: () async {
         await SupabaseConfig.client.from('vehicle_photos').delete().eq('id', id);
-      } catch (e) {
-        _syncService?.addToSyncQueue(
-          tableName: 'vehicle_photos',
-          recordId: id,
-          operation: 'delete',
-          data: {},
-        );
-      }
-    } else {
-      _syncService?.addToSyncQueue(
-        tableName: 'vehicle_photos',
-        recordId: id,
-        operation: 'delete',
-        data: {},
-      );
-    }
+      },
+    );
 
     DbChangeService.instance.notifyChange('vehicle_photos');
     return result;

@@ -1,13 +1,12 @@
-import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
 import '../database/database.dart';
 import '../services/db_change_service.dart';
 import '../services/sync_service.dart';
 import '../../core/config/supabase_config.dart';
 import '../../domain/models/fuel_charge.dart';
+import 'syncable_repository.dart';
 
-class FuelChargeRepository {
+class FuelChargeRepository with SyncableRepository {
   final DatabaseHelper _dbHelper = DatabaseHelper.instance;
   final _uuid = const Uuid();
   SyncService? _syncService;
@@ -16,10 +15,8 @@ class FuelChargeRepository {
     _syncService = syncService;
   }
 
-  Future<bool> get _isOnline async {
-    final result = await Connectivity().checkConnectivity();
-    return result != ConnectivityResult.none && SupabaseConfig.isConfigured;
-  }
+  @override
+  SyncService? get syncService => _syncService;
 
   // Obtener cargas de combustible de un vehículo
   Future<List<FuelCharge>> getFuelChargesByVehicle(String vehicleId) async {
@@ -186,27 +183,18 @@ class FuelChargeRepository {
     await db.insert('fuel_charges', map);
 
     // Sincronizar con Supabase
-    if (await _isOnline) {
-      try {
+    await pushWrite(
+      table: 'fuel_charges',
+      recordId: id,
+      operation: 'insert',
+      data: newCharge.toSupabase(),
+      remoteOp: () async {
         await SupabaseConfig.client.from('fuel_charges').insert(newCharge.toSupabase());
+      },
+      markSynced: () async {
         await db.update('fuel_charges', {'synced': 1}, where: 'id = ?', whereArgs: [id]);
-      } catch (e) {
-        debugPrint('Error syncing fuel charge: $e');
-        _syncService?.addToSyncQueue(
-          tableName: 'fuel_charges',
-          recordId: id,
-          operation: 'insert',
-          data: newCharge.toSupabase(),
-        );
-      }
-    } else {
-      _syncService?.addToSyncQueue(
-        tableName: 'fuel_charges',
-        recordId: id,
-        operation: 'insert',
-        data: newCharge.toSupabase(),
-      );
-    }
+      },
+    );
 
     DbChangeService.instance.notifyChange('fuel_charges');
     return id;
@@ -229,30 +217,21 @@ class FuelChargeRepository {
     );
 
     // Sincronizar con Supabase
-    if (await _isOnline) {
-      try {
+    await pushWrite(
+      table: 'fuel_charges',
+      recordId: fuelCharge.id!,
+      operation: 'update',
+      data: updatedCharge.toSupabase(),
+      remoteOp: () async {
         await SupabaseConfig.client
             .from('fuel_charges')
             .update(updatedCharge.toSupabase())
             .eq('id', fuelCharge.id!);
+      },
+      markSynced: () async {
         await db.update('fuel_charges', {'synced': 1}, where: 'id = ?', whereArgs: [fuelCharge.id]);
-      } catch (e) {
-        debugPrint('Error syncing fuel charge update: $e');
-        _syncService?.addToSyncQueue(
-          tableName: 'fuel_charges',
-          recordId: fuelCharge.id!,
-          operation: 'update',
-          data: updatedCharge.toSupabase(),
-        );
-      }
-    } else {
-      _syncService?.addToSyncQueue(
-        tableName: 'fuel_charges',
-        recordId: fuelCharge.id!,
-        operation: 'update',
-        data: updatedCharge.toSupabase(),
-      );
-    }
+      },
+    );
 
     DbChangeService.instance.notifyChange('fuel_charges');
     return result;
@@ -264,26 +243,15 @@ class FuelChargeRepository {
     final result = await db.delete('fuel_charges', where: 'id = ?', whereArgs: [id]);
 
     // Sincronizar con Supabase
-    if (await _isOnline) {
-      try {
+    await pushWrite(
+      table: 'fuel_charges',
+      recordId: id,
+      operation: 'delete',
+      data: {},
+      remoteOp: () async {
         await SupabaseConfig.client.from('fuel_charges').delete().eq('id', id);
-      } catch (e) {
-        debugPrint('Error syncing fuel charge delete: $e');
-        _syncService?.addToSyncQueue(
-          tableName: 'fuel_charges',
-          recordId: id,
-          operation: 'delete',
-          data: {},
-        );
-      }
-    } else {
-      _syncService?.addToSyncQueue(
-        tableName: 'fuel_charges',
-        recordId: id,
-        operation: 'delete',
-        data: {},
-      );
-    }
+      },
+    );
 
     DbChangeService.instance.notifyChange('fuel_charges');
     return result;

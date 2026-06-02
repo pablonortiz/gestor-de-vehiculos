@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
 import '../database/database.dart';
 import '../services/db_change_service.dart';
 import '../services/sync_service.dart';
@@ -8,8 +7,9 @@ import '../../core/config/supabase_config.dart';
 import '../../core/utils/text_normalizer.dart';
 import '../../domain/models/city.dart';
 import '../../domain/models/lugar.dart';
+import 'syncable_repository.dart';
 
-class LocationRepository {
+class LocationRepository with SyncableRepository {
   final DatabaseHelper _dbHelper = DatabaseHelper.instance;
   final _uuid = const Uuid();
   SyncService? _syncService;
@@ -18,11 +18,8 @@ class LocationRepository {
     _syncService = syncService;
   }
 
-  Future<bool> get _isOnline async {
-    if (kIsWeb) return SupabaseConfig.isConfigured;
-    final result = await Connectivity().checkConnectivity();
-    return result != ConnectivityResult.none && SupabaseConfig.isConfigured;
-  }
+  @override
+  SyncService? get syncService => _syncService;
 
   // ============================================================
   // CITIES
@@ -160,27 +157,18 @@ class LocationRepository {
     await db.insert('cities', map);
 
     // Sync with Supabase
-    if (await _isOnline) {
-      try {
+    await pushWrite(
+      table: 'cities',
+      recordId: id,
+      operation: 'insert',
+      data: newCity.toSupabase(),
+      remoteOp: () async {
         await SupabaseConfig.client.from('cities').insert(newCity.toSupabase());
+      },
+      markSynced: () async {
         await db.update('cities', {'synced': 1}, where: 'id = ?', whereArgs: [id]);
-      } catch (e) {
-        debugPrint('Error syncing city: $e');
-        _syncService?.addToSyncQueue(
-          tableName: 'cities',
-          recordId: id,
-          operation: 'insert',
-          data: newCity.toSupabase(),
-        );
-      }
-    } else {
-      _syncService?.addToSyncQueue(
-        tableName: 'cities',
-        recordId: id,
-        operation: 'insert',
-        data: newCity.toSupabase(),
-      );
-    }
+      },
+    );
 
     DbChangeService.instance.notifyChange('cities');
     return newCity;
@@ -349,27 +337,18 @@ class LocationRepository {
     await db.insert('lugares', map);
 
     // Sync with Supabase
-    if (await _isOnline) {
-      try {
+    await pushWrite(
+      table: 'lugares',
+      recordId: id,
+      operation: 'insert',
+      data: newLugar.toSupabase(),
+      remoteOp: () async {
         await SupabaseConfig.client.from('lugares').insert(newLugar.toSupabase());
+      },
+      markSynced: () async {
         await db.update('lugares', {'synced': 1}, where: 'id = ?', whereArgs: [id]);
-      } catch (e) {
-        debugPrint('Error syncing lugar: $e');
-        _syncService?.addToSyncQueue(
-          tableName: 'lugares',
-          recordId: id,
-          operation: 'insert',
-          data: newLugar.toSupabase(),
-        );
-      }
-    } else {
-      _syncService?.addToSyncQueue(
-        tableName: 'lugares',
-        recordId: id,
-        operation: 'insert',
-        data: newLugar.toSupabase(),
-      );
-    }
+      },
+    );
 
     DbChangeService.instance.notifyChange('lugares');
     return newLugar;

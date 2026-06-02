@@ -1,13 +1,12 @@
-import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
 import '../database/database.dart';
 import '../services/db_change_service.dart';
 import '../services/sync_service.dart';
 import '../../core/config/supabase_config.dart';
 import '../../domain/models/maintenance.dart';
+import 'syncable_repository.dart';
 
-class MaintenanceRepository {
+class MaintenanceRepository with SyncableRepository {
   final DatabaseHelper _dbHelper = DatabaseHelper.instance;
   final _uuid = const Uuid();
   SyncService? _syncService;
@@ -16,10 +15,8 @@ class MaintenanceRepository {
     _syncService = syncService;
   }
 
-  Future<bool> get _isOnline async {
-    final result = await Connectivity().checkConnectivity();
-    return result != ConnectivityResult.none && SupabaseConfig.isConfigured;
-  }
+  @override
+  SyncService? get syncService => _syncService;
 
   // Obtener mantenimientos de un vehículo
   Future<List<Maintenance>> getMaintenancesByVehicle(String vehicleId) async {
@@ -30,14 +27,28 @@ class MaintenanceRepository {
       whereArgs: [vehicleId],
       orderBy: 'date DESC',
     );
-    
-    final maintenances = <Maintenance>[];
-    for (final map in maps) {
-      final invoices = await getInvoicesByMaintenance(map['id'] as String);
-      maintenances.add(Maintenance.fromMap(map).copyWith(invoices: invoices));
+    if (maps.isEmpty) return [];
+
+    // Traer todas las facturas en una sola query (evita N+1) y agrupar por mantenimiento.
+    final ids = maps.map((m) => m['id'] as String).toList();
+    final placeholders = List.filled(ids.length, '?').join(', ');
+    final invoiceMaps = await db.query(
+      'maintenance_invoices',
+      where: 'maintenance_id IN ($placeholders)',
+      whereArgs: ids,
+      orderBy: 'created_at DESC',
+    );
+    final invoicesByMaintenance = <String, List<MaintenanceInvoice>>{};
+    for (final m in invoiceMaps) {
+      (invoicesByMaintenance[m['maintenance_id'] as String] ??= [])
+          .add(MaintenanceInvoice.fromMap(m));
     }
-    
-    return maintenances;
+
+    return maps
+        .map((map) => Maintenance.fromMap(map).copyWith(
+              invoices: invoicesByMaintenance[map['id'] as String] ?? const [],
+            ))
+        .toList();
   }
 
   // Obtener un mantenimiento por ID
@@ -66,26 +77,18 @@ class MaintenanceRepository {
     await db.insert('maintenances', map);
     
     // Sincronizar con Supabase
-    if (await _isOnline) {
-      try {
+    await pushWrite(
+      table: 'maintenances',
+      recordId: id,
+      operation: 'insert',
+      data: newMaintenance.toSupabase(),
+      remoteOp: () async {
         await SupabaseConfig.client.from('maintenances').insert(newMaintenance.toSupabase());
+      },
+      markSynced: () async {
         await db.update('maintenances', {'synced': 1}, where: 'id = ?', whereArgs: [id]);
-      } catch (e) {
-        _syncService?.addToSyncQueue(
-          tableName: 'maintenances',
-          recordId: id,
-          operation: 'insert',
-          data: newMaintenance.toSupabase(),
-        );
-      }
-    } else {
-      _syncService?.addToSyncQueue(
-        tableName: 'maintenances',
-        recordId: id,
-        operation: 'insert',
-        data: newMaintenance.toSupabase(),
-      );
-    }
+      },
+    );
 
     DbChangeService.instance.notifyChange('maintenances');
     return id;
@@ -108,29 +111,21 @@ class MaintenanceRepository {
     );
     
     // Sincronizar con Supabase
-    if (await _isOnline) {
-      try {
+    await pushWrite(
+      table: 'maintenances',
+      recordId: maintenance.id!,
+      operation: 'update',
+      data: updatedMaintenance.toSupabase(),
+      remoteOp: () async {
         await SupabaseConfig.client
             .from('maintenances')
             .update(updatedMaintenance.toSupabase())
             .eq('id', maintenance.id!);
+      },
+      markSynced: () async {
         await db.update('maintenances', {'synced': 1}, where: 'id = ?', whereArgs: [maintenance.id]);
-      } catch (e) {
-        _syncService?.addToSyncQueue(
-          tableName: 'maintenances',
-          recordId: maintenance.id!,
-          operation: 'update',
-          data: updatedMaintenance.toSupabase(),
-        );
-      }
-    } else {
-      _syncService?.addToSyncQueue(
-        tableName: 'maintenances',
-        recordId: maintenance.id!,
-        operation: 'update',
-        data: updatedMaintenance.toSupabase(),
-      );
-    }
+      },
+    );
 
     DbChangeService.instance.notifyChange('maintenances');
     return result;
@@ -144,27 +139,17 @@ class MaintenanceRepository {
     await db.delete('maintenance_invoices', where: 'maintenance_id = ?', whereArgs: [id]);
     
     final result = await db.delete('maintenances', where: 'id = ?', whereArgs: [id]);
-    
+
     // Sincronizar con Supabase
-    if (await _isOnline) {
-      try {
+    await pushWrite(
+      table: 'maintenances',
+      recordId: id,
+      operation: 'delete',
+      data: {},
+      remoteOp: () async {
         await SupabaseConfig.client.from('maintenances').delete().eq('id', id);
-      } catch (e) {
-        _syncService?.addToSyncQueue(
-          tableName: 'maintenances',
-          recordId: id,
-          operation: 'delete',
-          data: {},
-        );
-      }
-    } else {
-      _syncService?.addToSyncQueue(
-        tableName: 'maintenances',
-        recordId: id,
-        operation: 'delete',
-        data: {},
-      );
-    }
+      },
+    );
 
     DbChangeService.instance.notifyChange('maintenances');
     DbChangeService.instance.notifyChange('maintenance_invoices');
@@ -201,26 +186,18 @@ class MaintenanceRepository {
     await db.insert('maintenance_invoices', map);
     
     // Sincronizar con Supabase
-    if (await _isOnline) {
-      try {
+    await pushWrite(
+      table: 'maintenance_invoices',
+      recordId: id,
+      operation: 'insert',
+      data: newInvoice.toSupabase(),
+      remoteOp: () async {
         await SupabaseConfig.client.from('maintenance_invoices').insert(newInvoice.toSupabase());
+      },
+      markSynced: () async {
         await db.update('maintenance_invoices', {'synced': 1}, where: 'id = ?', whereArgs: [id]);
-      } catch (e) {
-        _syncService?.addToSyncQueue(
-          tableName: 'maintenance_invoices',
-          recordId: id,
-          operation: 'insert',
-          data: newInvoice.toSupabase(),
-        );
-      }
-    } else {
-      _syncService?.addToSyncQueue(
-        tableName: 'maintenance_invoices',
-        recordId: id,
-        operation: 'insert',
-        data: newInvoice.toSupabase(),
-      );
-    }
+      },
+    );
 
     DbChangeService.instance.notifyChange('maintenance_invoices');
     return id;
@@ -229,27 +206,17 @@ class MaintenanceRepository {
   Future<int> deleteInvoice(String id) async {
     final db = await _dbHelper.database;
     final result = await db.delete('maintenance_invoices', where: 'id = ?', whereArgs: [id]);
-    
+
     // Sincronizar con Supabase
-    if (await _isOnline) {
-      try {
+    await pushWrite(
+      table: 'maintenance_invoices',
+      recordId: id,
+      operation: 'delete',
+      data: {},
+      remoteOp: () async {
         await SupabaseConfig.client.from('maintenance_invoices').delete().eq('id', id);
-      } catch (e) {
-        _syncService?.addToSyncQueue(
-          tableName: 'maintenance_invoices',
-          recordId: id,
-          operation: 'delete',
-          data: {},
-        );
-      }
-    } else {
-      _syncService?.addToSyncQueue(
-        tableName: 'maintenance_invoices',
-        recordId: id,
-        operation: 'delete',
-        data: {},
-      );
-    }
+      },
+    );
 
     DbChangeService.instance.notifyChange('maintenance_invoices');
     return result;

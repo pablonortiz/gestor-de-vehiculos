@@ -7,9 +7,9 @@ import '../../core/config/supabase_config.dart';
 import '../../core/constants/vehicle_constants.dart';
 import '../../domain/models/vehicle.dart';
 import '../../domain/models/vehicle_history.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
+import 'syncable_repository.dart';
 
-class VehicleRepository {
+class VehicleRepository with SyncableRepository {
   final DatabaseHelper _dbHelper = DatabaseHelper.instance;
   final _uuid = const Uuid();
   SyncService? _syncService;
@@ -18,37 +18,16 @@ class VehicleRepository {
     _syncService = syncService;
   }
 
-  Future<bool> get _isOnline async {
-    if (kIsWeb) return SupabaseConfig.isConfigured;
-    final result = await Connectivity().checkConnectivity();
-    final isOnline = result != ConnectivityResult.none && SupabaseConfig.isConfigured;
-    debugPrint('🌐 [REPO] isOnline: $isOnline (connectivity: $result, configured: ${SupabaseConfig.isConfigured})');
-    return isOnline;
-  }
+  @override
+  SyncService? get syncService => _syncService;
 
   Future<List<Vehicle>> getAllVehicles() async {
-    // En web, obtener directamente de Supabase
-    if (kIsWeb) {
-      if (!SupabaseConfig.isConfigured) return [];
-      final data = await SupabaseConfig.client.from('vehicles').select().order('updated_at', ascending: false);
-      return (data as List).map((e) => Vehicle.fromSupabase(e)).toList();
-    }
-    
     final db = await _dbHelper.database;
     final maps = await db.query('vehicles', orderBy: 'updated_at DESC');
     return maps.map((map) => Vehicle.fromMap(map)).toList();
   }
 
   Future<List<Vehicle>> getVehiclesByProvince(int provinceId) async {
-    if (kIsWeb) {
-      if (!SupabaseConfig.isConfigured) return [];
-      final data = await SupabaseConfig.client.from('vehicles')
-          .select()
-          .eq('province_id', provinceId)
-          .order('updated_at', ascending: false);
-      return (data as List).map((e) => Vehicle.fromSupabase(e)).toList();
-    }
-    
     final db = await _dbHelper.database;
     final maps = await db.query(
       'vehicles',
@@ -60,15 +39,6 @@ class VehicleRepository {
   }
 
   Future<List<Vehicle>> getVehiclesByStatus(int statusIndex) async {
-    if (kIsWeb) {
-      if (!SupabaseConfig.isConfigured) return [];
-      final data = await SupabaseConfig.client.from('vehicles')
-          .select()
-          .eq('status', statusIndex)
-          .order('updated_at', ascending: false);
-      return (data as List).map((e) => Vehicle.fromSupabase(e)).toList();
-    }
-
     final db = await _dbHelper.database;
     final maps = await db.query(
       'vehicles',
@@ -80,15 +50,6 @@ class VehicleRepository {
   }
 
   Future<List<Vehicle>> getVehiclesByCity(String cityId) async {
-    if (kIsWeb) {
-      if (!SupabaseConfig.isConfigured) return [];
-      final data = await SupabaseConfig.client.from('vehicles')
-          .select()
-          .eq('city_id', cityId)
-          .order('updated_at', ascending: false);
-      return (data as List).map((e) => Vehicle.fromSupabase(e)).toList();
-    }
-
     final db = await _dbHelper.database;
     final maps = await db.query(
       'vehicles',
@@ -100,15 +61,6 @@ class VehicleRepository {
   }
 
   Future<List<Vehicle>> getVehiclesByLugar(String lugarId) async {
-    if (kIsWeb) {
-      if (!SupabaseConfig.isConfigured) return [];
-      final data = await SupabaseConfig.client.from('vehicles')
-          .select()
-          .eq('lugar_id', lugarId)
-          .order('updated_at', ascending: false);
-      return (data as List).map((e) => Vehicle.fromSupabase(e)).toList();
-    }
-
     final db = await _dbHelper.database;
     final maps = await db.query(
       'vehicles',
@@ -125,16 +77,6 @@ class VehicleRepository {
     String? cityId,
     String? lugarId,
   }) async {
-    if (kIsWeb) {
-      if (!SupabaseConfig.isConfigured) return [];
-      var query = SupabaseConfig.client.from('vehicles').select();
-      if (provinceId != null) query = query.eq('province_id', provinceId);
-      if (cityId != null) query = query.eq('city_id', cityId);
-      if (lugarId != null) query = query.eq('lugar_id', lugarId);
-      final data = await query.order('updated_at', ascending: false);
-      return (data as List).map((e) => Vehicle.fromSupabase(e)).toList();
-    }
-
     final db = await _dbHelper.database;
     final List<String> conditions = [];
     final List<dynamic> args = [];
@@ -162,13 +104,6 @@ class VehicleRepository {
   }
 
   Future<Vehicle?> getVehicleById(String id) async {
-    if (kIsWeb) {
-      if (!SupabaseConfig.isConfigured) return null;
-      final data = await SupabaseConfig.client.from('vehicles').select().eq('id', id).maybeSingle();
-      if (data == null) return null;
-      return Vehicle.fromSupabase(data);
-    }
-    
     final db = await _dbHelper.database;
     final maps = await db.query(
       'vehicles',
@@ -180,16 +115,6 @@ class VehicleRepository {
   }
 
   Future<Vehicle?> getVehicleByPlate(String plate) async {
-    if (kIsWeb) {
-      if (!SupabaseConfig.isConfigured) return null;
-      final data = await SupabaseConfig.client.from('vehicles')
-          .select()
-          .eq('plate', plate.toUpperCase())
-          .maybeSingle();
-      if (data == null) return null;
-      return Vehicle.fromSupabase(data);
-    }
-    
     final db = await _dbHelper.database;
     final maps = await db.query(
       'vehicles',
@@ -206,23 +131,7 @@ class VehicleRepository {
     final id = _uuid.v4();
     final newVehicle = vehicle.copyWith(id: id);
     final historyId = _uuid.v4();
-    
-    // En web, insertar directamente en Supabase
-    if (kIsWeb) {
-      if (!SupabaseConfig.isConfigured) throw Exception('Supabase no configurado');
 
-      await SupabaseConfig.client.from('vehicles').insert(newVehicle.toSupabase());
-      await SupabaseConfig.client.from('vehicle_history').insert({
-        'id': historyId,
-        'vehicle_id': id,
-        'field': 'created',
-        'old_value': '',
-        'new_value': 'Vehículo creado',
-      });
-      DbChangeService.instance.notifyChange('vehicles');
-      return id;
-    }
-    
     final db = await _dbHelper.database;
     
     final map = newVehicle.toMap();
@@ -242,14 +151,18 @@ class VehicleRepository {
     ));
     
     // Sincronizar con Supabase
-    if (await _isOnline) {
-      try {
+    await pushWrite(
+      table: 'vehicles',
+      recordId: id,
+      operation: 'insert',
+      data: newVehicle.toSupabase(),
+      remoteOp: () async {
         debugPrint('📤 [REPO] Intentando subir a Supabase...');
         debugPrint('📤 [REPO] Datos: ${newVehicle.toSupabase()}');
-        
+
         await SupabaseConfig.client.from('vehicles').insert(newVehicle.toSupabase());
         debugPrint('✅ [REPO] Vehículo subido a Supabase exitosamente');
-        
+
         await SupabaseConfig.client.from('vehicle_history').insert({
           'id': historyId,
           'vehicle_id': id,
@@ -257,28 +170,12 @@ class VehicleRepository {
           'old_value': '',
           'new_value': 'Vehículo creado',
         });
+      },
+      markSynced: () async {
         await db.update('vehicles', {'synced': 1}, where: 'id = ?', whereArgs: [id]);
         debugPrint('✅ [REPO] Marcado como sincronizado');
-      } catch (e, stack) {
-        debugPrint('❌ [REPO] Error subiendo a Supabase: $e');
-        debugPrint('❌ [REPO] Stack: $stack');
-        // Agregar a cola de sincronización
-        _syncService?.addToSyncQueue(
-          tableName: 'vehicles',
-          recordId: id,
-          operation: 'insert',
-          data: newVehicle.toSupabase(),
-        );
-      }
-    } else {
-      debugPrint('📴 [REPO] Sin conexión, agregando a cola de sync');
-      _syncService?.addToSyncQueue(
-        tableName: 'vehicles',
-        recordId: id,
-        operation: 'insert',
-        data: newVehicle.toSupabase(),
-      );
-    }
+      },
+    );
 
     DbChangeService.instance.notifyChange('vehicles');
     return id;
@@ -310,29 +207,21 @@ class VehicleRepository {
     }
     
     // Sincronizar con Supabase
-    if (await _isOnline) {
-      try {
+    await pushWrite(
+      table: 'vehicles',
+      recordId: vehicle.id!,
+      operation: 'update',
+      data: updatedVehicle.toSupabase(),
+      remoteOp: () async {
         await SupabaseConfig.client
             .from('vehicles')
             .update(updatedVehicle.toSupabase())
             .eq('id', vehicle.id!);
+      },
+      markSynced: () async {
         await db.update('vehicles', {'synced': 1}, where: 'id = ?', whereArgs: [vehicle.id]);
-      } catch (e) {
-        _syncService?.addToSyncQueue(
-          tableName: 'vehicles',
-          recordId: vehicle.id!,
-          operation: 'update',
-          data: updatedVehicle.toSupabase(),
-        );
-      }
-    } else {
-      _syncService?.addToSyncQueue(
-        tableName: 'vehicles',
-        recordId: vehicle.id!,
-        operation: 'update',
-        data: updatedVehicle.toSupabase(),
-      );
-    }
+      },
+    );
 
     DbChangeService.instance.notifyChange('vehicles');
     return result;
@@ -340,35 +229,23 @@ class VehicleRepository {
 
   Future<int> deleteVehicle(String id) async {
     final db = await _dbHelper.database;
-    
-    // Eliminar localmente
-    await db.delete('vehicle_history', where: 'vehicle_id = ?', whereArgs: [id]);
-    await db.delete('maintenances', where: 'vehicle_id = ?', whereArgs: [id]);
-    await db.delete('vehicle_notes', where: 'vehicle_id = ?', whereArgs: [id]);
-    await db.delete('vehicle_photos', where: 'vehicle_id = ?', whereArgs: [id]);
-    
+
+    // Con foreign_keys=ON (ver DatabaseHelper._onConfigure), borrar el vehículo
+    // elimina en cascada su historial, mantenimientos (y facturas), notas (y sus
+    // fotos), fotos, documentos y cargas de combustible vía los ON DELETE CASCADE
+    // del schema. Un único delete es atómico, sin riesgo de borrado parcial.
     final result = await db.delete('vehicles', where: 'id = ?', whereArgs: [id]);
-    
+
     // Sincronizar con Supabase
-    if (await _isOnline) {
-      try {
+    await pushWrite(
+      table: 'vehicles',
+      recordId: id,
+      operation: 'delete',
+      data: {},
+      remoteOp: () async {
         await SupabaseConfig.client.from('vehicles').delete().eq('id', id);
-      } catch (e) {
-        _syncService?.addToSyncQueue(
-          tableName: 'vehicles',
-          recordId: id,
-          operation: 'delete',
-          data: {},
-        );
-      }
-    } else {
-      _syncService?.addToSyncQueue(
-        tableName: 'vehicles',
-        recordId: id,
-        operation: 'delete',
-        data: {},
-      );
-    }
+      },
+    );
 
     DbChangeService.instance.notifyChange('vehicles');
     return result;
@@ -437,16 +314,20 @@ class VehicleRepository {
     final map = history.toMap();
     map['synced'] = 0;
     await db.insert('vehicle_history', map);
-    
+
     // Sincronizar con Supabase
-    if (await _isOnline) {
-      try {
+    await pushWrite(
+      table: 'vehicle_history',
+      recordId: history.id!,
+      operation: 'insert',
+      data: history.toSupabase(),
+      remoteOp: () async {
         await SupabaseConfig.client.from('vehicle_history').insert(history.toSupabase());
+      },
+      markSynced: () async {
         await db.update('vehicle_history', {'synced': 1}, where: 'id = ?', whereArgs: [history.id]);
-      } catch (e) {
-        // Se sincronizará después
-      }
-    }
+      },
+    );
   }
 
   Future<void> _recordChanges(Vehicle oldVehicle, Vehicle newVehicle) async {
