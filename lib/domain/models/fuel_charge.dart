@@ -4,7 +4,6 @@ class FuelCharge {
   final DateTime date;
   final double liters;
   final double price;
-  final double? pricePerLiter;
   final int? odometer;
   final String? receiptPhotoUrl;
   final String? receiptPhotoPublicId;
@@ -24,7 +23,6 @@ class FuelCharge {
     required this.date,
     required this.liters,
     required this.price,
-    this.pricePerLiter,
     this.odometer,
     this.receiptPhotoUrl,
     this.receiptPhotoPublicId,
@@ -49,7 +47,6 @@ class FuelCharge {
     DateTime? date,
     double? liters,
     double? price,
-    double? pricePerLiter,
     int? odometer,
     String? receiptPhotoUrl,
     String? receiptPhotoPublicId,
@@ -69,7 +66,6 @@ class FuelCharge {
       date: date ?? this.date,
       liters: liters ?? this.liters,
       price: price ?? this.price,
-      pricePerLiter: pricePerLiter ?? this.pricePerLiter,
       odometer: odometer ?? this.odometer,
       receiptPhotoUrl: receiptPhotoUrl ?? this.receiptPhotoUrl,
       receiptPhotoPublicId: receiptPhotoPublicId ?? this.receiptPhotoPublicId,
@@ -92,7 +88,7 @@ class FuelCharge {
       'date': date.toIso8601String(),
       'liters': liters,
       'price': price,
-      'price_per_liter': pricePerLiter ?? calculatedPricePerLiter,
+      'price_per_liter': calculatedPricePerLiter,
       'odometer': odometer,
       'receipt_photo_url': receiptPhotoUrl,
       'receipt_photo_public_id': receiptPhotoPublicId,
@@ -113,9 +109,6 @@ class FuelCharge {
       date: DateTime.parse(map['date'] as String),
       liters: (map['liters'] as num).toDouble(),
       price: (map['price'] as num).toDouble(),
-      pricePerLiter: map['price_per_liter'] != null
-          ? (map['price_per_liter'] as num).toDouble()
-          : null,
       odometer: map['odometer'] as int?,
       receiptPhotoUrl: map['receipt_photo_url'] as String?,
       receiptPhotoPublicId: map['receipt_photo_public_id'] as String?,
@@ -138,7 +131,7 @@ class FuelCharge {
       'date': date.millisecondsSinceEpoch,
       'liters': liters,
       'price': price,
-      'price_per_liter': pricePerLiter ?? calculatedPricePerLiter,
+      'price_per_liter': calculatedPricePerLiter,
       'odometer': odometer,
       'receipt_photo_url': receiptPhotoUrl,
       'receipt_photo_public_id': receiptPhotoPublicId,
@@ -161,9 +154,6 @@ class FuelCharge {
       date: DateTime.fromMillisecondsSinceEpoch(map['date'] as int),
       liters: (map['liters'] as num).toDouble(),
       price: (map['price'] as num).toDouble(),
-      pricePerLiter: map['price_per_liter'] != null
-          ? (map['price_per_liter'] as num).toDouble()
-          : null,
       odometer: map['odometer'] as int?,
       receiptPhotoUrl: map['receipt_photo_url'] as String?,
       receiptPhotoPublicId: map['receipt_photo_public_id'] as String?,

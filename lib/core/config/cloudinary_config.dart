@@ -10,9 +10,4 @@ class CloudinaryConfig {
     uploadPreset,
     cache: false,
   );
-
-  static bool get isConfigured =>
-      cloudName.isNotEmpty && 
-      uploadPreset.isNotEmpty &&
-      cloudName != 'TU_CLOUD_NAME';
 }
