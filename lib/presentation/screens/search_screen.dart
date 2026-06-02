@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -17,9 +18,7 @@ class SearchScreen extends ConsumerStatefulWidget {
 class _SearchScreenState extends ConsumerState<SearchScreen> {
   final _searchController = TextEditingController();
   final _focusNode = FocusNode();
-  List<Vehicle> _results = [];
-  bool _isSearching = false;
-  bool _hasSearched = false;
+  Timer? _debounce;
 
   @override
   void initState() {
@@ -29,36 +28,34 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
   @override
   void dispose() {
+    _debounce?.cancel();
+    // Reset shared query so reopening Search starts empty.
+    ref.read(searchQueryProvider.notifier).state = '';
     _searchController.dispose();
     _focusNode.dispose();
     super.dispose();
   }
 
-  Future<void> _search(String query) async {
-    if (query.isEmpty) {
-      setState(() {
-        _results = [];
-        _hasSearched = false;
-      });
-      return;
-    }
+  void _onQueryChanged(String query) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 300), () {
+      if (!mounted) return;
+      ref.read(searchQueryProvider.notifier).state = query;
+    });
+  }
 
-    setState(() => _isSearching = true);
-
-    try {
-      final repository = ref.read(vehicleRepositoryProvider);
-      final results = await repository.searchVehicles(query);
-      setState(() {
-        _results = results;
-        _hasSearched = true;
-      });
-    } finally {
-      setState(() => _isSearching = false);
-    }
+  void _clearSearch() {
+    _debounce?.cancel();
+    _searchController.clear();
+    ref.read(searchQueryProvider.notifier).state = '';
+    _focusNode.requestFocus();
   }
 
   @override
   Widget build(BuildContext context) {
+    final query = ref.watch(searchQueryProvider);
+    final resultsAsync = ref.watch(vehicleSearchProvider(query));
+
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -84,44 +81,45 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             fontSize: 16,
             color: AppTheme.textPrimary,
           ),
-          onChanged: (value) {
-            // Debounce
-            Future.delayed(const Duration(milliseconds: 300), () {
-              if (_searchController.text == value) {
-                _search(value);
-              }
-            });
+          onChanged: _onQueryChanged,
+          onSubmitted: (value) {
+            _debounce?.cancel();
+            ref.read(searchQueryProvider.notifier).state = value;
           },
-          onSubmitted: _search,
         ),
         actions: [
           if (_searchController.text.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.clear),
-              onPressed: () {
-                _searchController.clear();
-                _search('');
-                _focusNode.requestFocus();
-              },
+              onPressed: _clearSearch,
             ),
         ],
       ),
       body: SafeArea(
-        child: _buildBody(),
+        child: _buildBody(query, resultsAsync),
       ),
     );
   }
 
-  Widget _buildBody() {
-    if (_isSearching) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (!_hasSearched) {
+  Widget _buildBody(String query, AsyncValue<List<Vehicle>> resultsAsync) {
+    if (query.isEmpty) {
       return _buildSuggestions();
     }
 
-    if (_results.isEmpty) {
+    return resultsAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (_, __) => const Center(
+        child: Text(
+          'Error al buscar',
+          style: TextStyle(color: AppTheme.textSecondary),
+        ),
+      ),
+      data: (results) => _buildResults(query, results),
+    );
+  }
+
+  Widget _buildResults(String query, List<Vehicle> results) {
+    if (results.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -154,12 +152,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
     return ListView.builder(
       padding: const EdgeInsets.all(20),
-      itemCount: _results.length,
+      itemCount: results.length,
       itemBuilder: (context, index) {
-        final vehicle = _results[index];
+        final vehicle = results[index];
         return _SearchResultCard(
           vehicle: vehicle,
-          searchQuery: _searchController.text,
+          searchQuery: query,
           onTap: () => context.push('/vehicle/${vehicle.id}'),
         );
       },

@@ -251,9 +251,6 @@ class HomeScreen extends ConsumerWidget {
   }
 
   void _showCitiesInProvince(BuildContext context, WidgetRef ref, Province province) {
-    final citiesAsync = ref.read(citiesByProvinceProvider(province.id));
-    final countsAsync = ref.read(vehicleCountByCityProvider(province.id));
-
     showModalBottomSheet(
       context: context,
       backgroundColor: AppTheme.surface,
@@ -283,24 +280,31 @@ class HomeScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 16),
             Flexible(
-              child: citiesAsync.when(
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (_, __) => const Center(child: Text('Error cargando ciudades')),
-                data: (cities) {
-                  if (cities.isEmpty) {
-                    return const Padding(
-                      padding: EdgeInsets.all(20),
-                      child: Text(
-                        'No hay ciudades registradas en esta provincia',
-                        textAlign: TextAlign.center,
-                      ),
-                    );
-                  }
+              child: Consumer(
+                builder: (context, ref, _) {
+                  final citiesAsync = ref.watch(citiesByProvinceProvider(province.id));
+                  final countsAsync = ref.watch(vehicleCountByCityProvider(province.id));
 
-                  return countsAsync.when(
-                    loading: () => _buildCityList(sheetContext, ref, province, cities, {}),
-                    error: (_, __) => _buildCityList(sheetContext, ref, province, cities, {}),
-                    data: (counts) => _buildCityList(sheetContext, ref, province, cities, counts),
+                  return citiesAsync.when(
+                    loading: () => const Center(child: CircularProgressIndicator()),
+                    error: (_, __) => const Center(child: Text('Error cargando ciudades')),
+                    data: (cities) {
+                      if (cities.isEmpty) {
+                        return const Padding(
+                          padding: EdgeInsets.all(20),
+                          child: Text(
+                            'No hay ciudades registradas en esta provincia',
+                            textAlign: TextAlign.center,
+                          ),
+                        );
+                      }
+
+                      return countsAsync.when(
+                        loading: () => _buildCityList(sheetContext, ref, province, cities, {}),
+                        error: (_, __) => _buildCityList(sheetContext, ref, province, cities, {}),
+                        data: (counts) => _buildCityList(sheetContext, ref, province, cities, counts),
+                      );
+                    },
                   );
                 },
               ),
