@@ -699,6 +699,90 @@ class PdfService {
     );
   }
 
+  /// Página de referencia a imagen que no se pudo descargar
+  static pw.Page _buildImageReferencePage(String url, String? fileName) {
+    return pw.Page(
+      pageFormat: PdfPageFormat.a4,
+      build: (context) {
+        return pw.Container(
+          decoration: const pw.BoxDecoration(color: _backgroundColor),
+          padding: const pw.EdgeInsets.all(40),
+          child: pw.Center(
+            child: pw.Container(
+              padding: const pw.EdgeInsets.all(40),
+              decoration: pw.BoxDecoration(
+                color: _surfaceColor,
+                borderRadius: pw.BorderRadius.circular(16),
+                border: pw.Border.all(color: _primaryColor, width: 2),
+              ),
+              child: pw.Column(
+                mainAxisSize: pw.MainAxisSize.min,
+                children: [
+                  pw.Container(
+                    padding: const pw.EdgeInsets.all(20),
+                    decoration: pw.BoxDecoration(
+                      color: PdfColor.fromInt(0xFFFF9800),
+                      borderRadius: pw.BorderRadius.circular(12),
+                    ),
+                    child: pw.Text(
+                      'IMG',
+                      style: pw.TextStyle(
+                        fontSize: 24,
+                        fontWeight: pw.FontWeight.bold,
+                        color: PdfColors.white,
+                      ),
+                    ),
+                  ),
+                  pw.SizedBox(height: 20),
+                  pw.Text(
+                    fileName ?? 'Imagen adjunta',
+                    style: pw.TextStyle(
+                      fontSize: 18,
+                      fontWeight: pw.FontWeight.bold,
+                      color: _textColor,
+                    ),
+                  ),
+                  pw.SizedBox(height: 12),
+                  pw.Text(
+                    'No se pudo descargar la imagen.',
+                    style: const pw.TextStyle(
+                      fontSize: 12,
+                      color: _textSecondary,
+                    ),
+                  ),
+                  pw.SizedBox(height: 8),
+                  pw.Text(
+                    'Puede accederla en:',
+                    style: const pw.TextStyle(
+                      fontSize: 10,
+                      color: _textSecondary,
+                    ),
+                  ),
+                  pw.SizedBox(height: 8),
+                  pw.Container(
+                    padding: const pw.EdgeInsets.all(12),
+                    decoration: pw.BoxDecoration(
+                      color: _backgroundColor,
+                      borderRadius: pw.BorderRadius.circular(8),
+                    ),
+                    child: pw.Text(
+                      url,
+                      style: const pw.TextStyle(
+                        fontSize: 8,
+                        color: _accentColor,
+                      ),
+                      maxLines: 3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   /// Construye una sección con título y filas
   static pw.Widget _buildSection(String title, List<pw.Widget> rows) {
     return pw.Container(
@@ -836,7 +920,7 @@ class PdfService {
         return response.bodyBytes;
       }
     } catch (e) {
-      debugPrint('🖼️ [PDF] Error descarga imagen: $e');
+      debugPrint('🖼️ [PDF] Error descarga imagen: $url -> $e');
     }
     return null;
   }
@@ -921,6 +1005,10 @@ class PdfService {
       await _addPdfAttachmentPages(pdf, attachment.url, attachment.fileName);
     } else if (attachment.imageBytes != null) {
       pdf.addPage(_buildFullPageImage(attachment.imageBytes!, attachment.caption));
+    } else {
+      // La descarga de la imagen falló (timeout/404/red): dejamos una página
+      // placeholder para que el adjunto no desaparezca del reporte sin aviso.
+      pdf.addPage(_buildImageReferencePage(attachment.url, attachment.fileName));
     }
   }
 
