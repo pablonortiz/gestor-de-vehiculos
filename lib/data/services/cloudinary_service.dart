@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:cloudinary_public/cloudinary_public.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
@@ -98,22 +99,28 @@ class CloudinaryService {
     
     if (result == null || result.files.isEmpty) return [];
     
+    final selectedFiles = result.files.where((f) => f.path != null).toList();
     final results = <CloudinaryUploadResult>[];
-    for (final file in result.files) {
-      if (file.path == null) continue;
-      
+    for (final file in selectedFiles) {
       final isPdf = file.extension?.toLowerCase() == 'pdf';
       final uploadResult = await _uploadFile(
         File(file.path!),
         isPdf: isPdf,
         fileName: file.name,
       );
-      
+
       if (uploadResult != null) {
         results.add(uploadResult);
       }
     }
-    
+
+    final failed = selectedFiles.length - results.length;
+    if (failed > 0) {
+      debugPrint(
+        'Subida múltiple de facturas: $failed de ${selectedFiles.length} archivos fallaron',
+      );
+    }
+
     return results;
   }
 
@@ -139,7 +146,7 @@ class CloudinaryService {
         fileName: fileName,
       );
     } catch (e) {
-      print('Error subiendo archivo a Cloudinary: $e');
+      debugPrint('Error subiendo archivo a Cloudinary: $e');
       return null;
     }
   }

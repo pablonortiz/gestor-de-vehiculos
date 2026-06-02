@@ -301,6 +301,9 @@ class _PriceLineChart extends StatelessWidget {
                 lineBarsData: [
                   LineChartBarData(
                     spots: data.asMap().entries.map((entry) {
+                      if (entry.value.averagePricePerLiter <= 0) {
+                        return FlSpot.nullSpot;
+                      }
                       return FlSpot(
                         entry.key.toDouble(),
                         entry.value.averagePricePerLiter,
