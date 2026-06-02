@@ -1,0 +1,663 @@
+part of '../vehicle_detail_screen.dart';
+
+// Sección de notas
+class _NotesSection extends ConsumerStatefulWidget {
+  final List<VehicleNote> notes;
+  final String vehicleId;
+
+  const _NotesSection({
+    required this.notes,
+    required this.vehicleId,
+  });
+
+  @override
+  ConsumerState<_NotesSection> createState() => _NotesSectionState();
+}
+
+class _NotesSectionState extends ConsumerState<_NotesSection> {
+  bool _isDeleting = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final dateFormat = DateFormat('dd/MM/yyyy HH:mm');
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const _SectionTitle(title: 'Notas'),
+            IconButton(
+              onPressed: () => _showNoteDialog(null),
+              icon: const Icon(Icons.add, color: AppTheme.accentPrimary),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (widget.notes.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppTheme.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppTheme.border),
+            ),
+            child: const Center(
+              child: Text(
+                'Sin notas',
+                style: TextStyle(color: AppTheme.textSecondary),
+              ),
+            ),
+          )
+        else
+          ...widget.notes.map((n) => _NoteCard(
+            note: n,
+            dateFormat: dateFormat,
+            onTap: () => _showNoteDialog(n),
+            onDelete: () => _deleteNote(n),
+            isDeleting: _isDeleting,
+          )),
+      ],
+    );
+  }
+
+  void _showNoteDialog(VehicleNote? note) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppTheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => _NoteFormSheet(
+        vehicleId: widget.vehicleId,
+        note: note,
+        onSaved: (message) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(message)),
+            );
+          }
+        },
+      ),
+    );
+  }
+
+  Future<void> _deleteNote(VehicleNote note) async {
+    setState(() => _isDeleting = true);
+    try {
+      final noteRepo = ref.read(noteRepositoryProvider);
+      await noteRepo.deleteNote(note.id!);
+      ref.invalidate(notesByVehicleProvider(widget.vehicleId));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Nota eliminada')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isDeleting = false);
+    }
+  }
+}
+
+// Contenido del modal de alta/edición de nota.
+// StatefulWidget dedicado para que el TextEditingController se libere en dispose.
+class _NoteFormSheet extends ConsumerStatefulWidget {
+  final String vehicleId;
+  final VehicleNote? note;
+  final void Function(String message) onSaved;
+
+  const _NoteFormSheet({
+    required this.vehicleId,
+    required this.note,
+    required this.onSaved,
+  });
+
+  @override
+  ConsumerState<_NoteFormSheet> createState() => _NoteFormSheetState();
+}
+
+class _NoteFormSheetState extends ConsumerState<_NoteFormSheet> {
+  late final TextEditingController _detailController;
+  late List<NotePhoto> _existingPhotos;
+  final List<XFile> _pendingPhotos = [];
+  final List<PlatformFile> _pendingFiles = [];
+  bool _isSaving = false;
+  bool _isSelectingPhotos = false;
+
+  bool get _isEditing => widget.note != null;
+
+  @override
+  void initState() {
+    super.initState();
+    _detailController = TextEditingController(text: widget.note?.detail ?? '');
+    _existingPhotos = List.from(widget.note?.photos ?? []);
+  }
+
+  @override
+  void dispose() {
+    _detailController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    _isEditing ? 'Editar Nota' : 'Nueva Nota',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: _isSaving ? null : () => Navigator.pop(context),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              TextFormField(
+                controller: _detailController,
+                maxLines: 4,
+                enabled: !_isSaving,
+                decoration: const InputDecoration(
+                  labelText: 'Detalle *',
+                  alignLabelWithHint: true,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Fotos',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  _isSelectingPhotos
+                      ? const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : TextButton.icon(
+                          onPressed: _isSaving ? null : _pickPhotos,
+                          icon: const Icon(Icons.add_photo_alternate, size: 18),
+                          label: const Text('Agregar'),
+                        ),
+                ],
+              ),
+              // Fotos existentes (solo en edición)
+              if (_existingPhotos.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                const Text('Archivos guardados:', style: TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+                const SizedBox(height: 4),
+                SizedBox(
+                  height: 80,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: _existingPhotos.length,
+                    itemBuilder: (ctx, index) {
+                      final photo = _existingPhotos[index];
+                      return Stack(
+                        children: [
+                          GestureDetector(
+                            onTap: () {
+                              if (photo.isPdf) {
+                                _showPdfPreview(context, photo.cloudinaryUrl, photo.fileName);
+                              } else {
+                                _showFullScreenImage(context, photo.cloudinaryUrl);
+                              }
+                            },
+                            child: Container(
+                              margin: const EdgeInsets.only(right: 8),
+                              width: 80,
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: photo.isPdf
+                                    ? _buildPdfThumbnailSmall(photo.fileName)
+                                    : CachedNetworkImage(
+                                        imageUrl: photo.cloudinaryUrl,
+                                        fit: BoxFit.cover,
+                                        placeholder: (_, __) => const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                                      ),
+                              ),
+                            ),
+                          ),
+                          if (!_isSaving)
+                            Positioned(
+                              top: 2,
+                              right: 10,
+                              child: GestureDetector(
+                                onTap: () async {
+                                  final noteRepo = ref.read(noteRepositoryProvider);
+                                  await noteRepo.deletePhoto(photo.id!);
+                                  setState(() {
+                                    _existingPhotos.remove(photo);
+                                  });
+                                  ref.invalidate(notesByVehicleProvider(widget.vehicleId));
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.all(2),
+                                  decoration: const BoxDecoration(
+                                    color: AppTheme.error,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.close, size: 14, color: Colors.white),
+                                ),
+                              ),
+                            ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+              ],
+              // Fotos pendientes de subir
+              if (_pendingPhotos.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                const Text('Pendientes de subir:', style: TextStyle(fontSize: 12, color: AppTheme.warning)),
+                const SizedBox(height: 4),
+                SizedBox(
+                  height: 80,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: _pendingPhotos.length,
+                    itemBuilder: (ctx, index) {
+                      final photo = _pendingPhotos[index];
+                      return Stack(
+                        children: [
+                          Container(
+                            margin: const EdgeInsets.only(right: 8),
+                            width: 80,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: AppTheme.warning),
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Image.file(
+                                File(photo.path),
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                          ),
+                          if (!_isSaving)
+                            Positioned(
+                              top: 2,
+                              right: 10,
+                              child: GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    _pendingPhotos.remove(photo);
+                                  });
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.all(2),
+                                  decoration: const BoxDecoration(
+                                    color: AppTheme.error,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.close, size: 14, color: Colors.white),
+                                ),
+                              ),
+                            ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+              ],
+              // Archivos pendientes (PDFs/imágenes del file picker)
+              if (_pendingFiles.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                const Text('Archivos pendientes:', style: TextStyle(fontSize: 12, color: AppTheme.warning)),
+                const SizedBox(height: 4),
+                SizedBox(
+                  height: 80,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: _pendingFiles.length,
+                    itemBuilder: (ctx, index) {
+                      final file = _pendingFiles[index];
+                      final isFilePdf = file.extension?.toLowerCase() == 'pdf';
+                      return Stack(
+                        children: [
+                          Container(
+                            margin: const EdgeInsets.only(right: 8),
+                            width: 80,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: AppTheme.warning),
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: isFilePdf
+                                  ? _buildPdfThumbnailSmall(file.name)
+                                  : Image.file(File(file.path!), fit: BoxFit.cover),
+                            ),
+                          ),
+                          if (!_isSaving)
+                            Positioned(
+                              top: 2,
+                              right: 10,
+                              child: GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    _pendingFiles.remove(file);
+                                  });
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.all(2),
+                                  decoration: const BoxDecoration(
+                                    color: AppTheme.error,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.close, size: 14, color: Colors.white),
+                                ),
+                              ),
+                            ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+              ],
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _isSaving ? null : _save,
+                  child: _isSaving
+                      ? const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
+                            SizedBox(width: 12),
+                            Text('Guardando...'),
+                          ],
+                        )
+                      : Text(_isEditing ? 'Guardar' : 'Agregar'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickPhotos() async {
+    final source = await showModalBottomSheet<String>(
+      context: context,
+      builder: (sheetCtx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text('Galería (múltiples)'),
+              onTap: () => Navigator.pop(sheetCtx, 'gallery'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.attach_file),
+              title: const Text('Archivo (PDF/Imagen)'),
+              onTap: () => Navigator.pop(sheetCtx, 'file'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source == null) return;
+    setState(() => _isSelectingPhotos = true);
+    try {
+      if (source == 'gallery') {
+        final picker = ImagePicker();
+        final images = await picker.pickMultiImage(imageQuality: 80);
+        if (images.isNotEmpty) {
+          setState(() {
+            _pendingPhotos.addAll(images);
+          });
+        }
+      } else if (source == 'file') {
+        final result = await FilePicker.platform.pickFiles(
+          type: FileType.custom,
+          allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png', 'webp'],
+          allowMultiple: true,
+        );
+        if (result != null && result.files.isNotEmpty) {
+          setState(() {
+            _pendingFiles.addAll(result.files.where((f) => f.path != null));
+          });
+        }
+      }
+    } finally {
+      if (mounted) setState(() => _isSelectingPhotos = false);
+    }
+  }
+
+  Future<void> _save() async {
+    if (_detailController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Completá el detalle')),
+      );
+      return;
+    }
+
+    setState(() => _isSaving = true);
+
+    try {
+      final noteRepo = ref.read(noteRepositoryProvider);
+      String noteId;
+
+      if (_isEditing) {
+        await noteRepo.updateNote(
+          widget.note!.copyWith(detail: _detailController.text),
+        );
+        noteId = widget.note!.id!;
+      } else {
+        noteId = await noteRepo.insertNote(VehicleNote(
+          vehicleId: widget.vehicleId,
+          detail: _detailController.text,
+        ));
+      }
+
+      // Subir fotos pendientes
+      if (_pendingPhotos.isNotEmpty) {
+        final cloudinary = CloudinaryService.instance;
+        for (final photo in _pendingPhotos) {
+          final result = await cloudinary.uploadFile(File(photo.path));
+          if (result != null) {
+            await noteRepo.insertPhoto(NotePhoto(
+              noteId: noteId,
+              cloudinaryUrl: result.url,
+              cloudinaryPublicId: result.publicId,
+            ));
+          }
+        }
+      }
+
+      // Subir archivos pendientes (PDF/imágenes del file picker)
+      if (_pendingFiles.isNotEmpty) {
+        final cloudinary = CloudinaryService.instance;
+        for (final file in _pendingFiles) {
+          if (file.path == null) continue;
+          final isPdf = file.extension?.toLowerCase() == 'pdf';
+          final result = await cloudinary.uploadFile(
+            File(file.path!),
+            isPdf: isPdf,
+            fileName: file.name,
+          );
+          if (result != null) {
+            await noteRepo.insertPhoto(NotePhoto(
+              noteId: noteId,
+              cloudinaryUrl: result.url,
+              cloudinaryPublicId: result.publicId,
+              isPdf: result.isPdf,
+              fileName: result.fileName,
+            ));
+          }
+        }
+      }
+
+      ref.invalidate(notesByVehicleProvider(widget.vehicleId));
+      if (mounted) {
+        Navigator.pop(context);
+        widget.onSaved(_isEditing ? 'Nota actualizada' : 'Nota agregada');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: AppTheme.error),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+}
+
+class _NoteCard extends StatelessWidget {
+  final VehicleNote note;
+  final DateFormat dateFormat;
+  final VoidCallback onTap;
+  final VoidCallback onDelete;
+  final bool isDeleting;
+
+  const _NoteCard({
+    required this.note,
+    required this.dateFormat,
+    required this.onTap,
+    required this.onDelete,
+    this.isDeleting = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: isDeleting ? null : onTap,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppTheme.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppTheme.border),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.warning.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.note, color: AppTheme.warning, size: 20),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        dateFormat.format(note.createdAt),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.textSecondary,
+                        ),
+                      ),
+                      if (note.photos.isNotEmpty)
+                        Text(
+                          '${note.photos.length} adjunto(s)',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.accentPrimary,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                isDeleting
+                    ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : IconButton(
+                        onPressed: onDelete,
+                        icon: const Icon(Icons.delete_outline, color: AppTheme.error, size: 20),
+                      ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              note.detail,
+              style: const TextStyle(
+                fontSize: 14,
+                color: AppTheme.textPrimary,
+                height: 1.4,
+              ),
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+            ),
+            if (note.photos.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              SizedBox(
+                height: 60,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: note.photos.length,
+                  itemBuilder: (context, index) {
+                    final photo = note.photos[index];
+                    return GestureDetector(
+                      onTap: () {
+                        if (photo.isPdf) {
+                          _showPdfPreview(context, photo.cloudinaryUrl, photo.fileName);
+                        } else {
+                          _showFullScreenImage(context, photo.cloudinaryUrl);
+                        }
+                      },
+                      child: Container(
+                        margin: const EdgeInsets.only(right: 8),
+                        width: 60,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: photo.isPdf
+                              ? _buildPdfThumbnailSmall(photo.fileName)
+                              : CachedNetworkImage(
+                                  imageUrl: photo.cloudinaryUrl,
+                                  fit: BoxFit.cover,
+                                ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
