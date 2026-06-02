@@ -51,7 +51,20 @@ class SyncService extends StateNotifier<SyncState> {
   SyncService() : super(SyncState());
 
   final _db = DatabaseHelper.instance;
-  
+
+  // Ventana corta para ignorar el "eco" de realtime de nuestras propias
+  // escrituras: Supabase emite eventos PostgresChange también por los writes de
+  // esta misma app, lo que dispararía un fullSync completo redundante por cada
+  // cambio local. No afecta la correctitud: un cambio de OTRO dispositivo que
+  // caiga en esta ventana se sincroniza en el siguiente evento o al reabrir.
+  DateTime? _suppressEchoUntil;
+  bool get shouldSuppressRealtimeEcho =>
+      _suppressEchoUntil != null && DateTime.now().isBefore(_suppressEchoUntil!);
+  void markSelfWrite() {
+    _suppressEchoUntil = DateTime.now().add(const Duration(seconds: 2));
+  }
+
+
   // Verificar conectividad
   Future<bool> get isOnline async {
     final result = await Connectivity().checkConnectivity();
@@ -158,6 +171,10 @@ class SyncService extends StateNotifier<SyncState> {
       DbChangeService.instance.notifyChange('fuel_charges');
       DbChangeService.instance.notifyChange('cities');
       DbChangeService.instance.notifyChange('lugares');
+
+      // Las escrituras que este sync acaba de subir generarán ecos de realtime;
+      // los suprimimos para no re-disparar otro fullSync.
+      markSelfWrite();
 
       state = state.copyWith(
         status: SyncStatus.success,
@@ -356,7 +373,10 @@ class SyncService extends StateNotifier<SyncState> {
 
         switch (operation) {
           case 'insert':
-            await client.from(tableName).insert(data);
+            // upsert (no insert) para que el reintento sea idempotente: si el
+            // registro ya existe en Supabase (ej. el insert original tuvo éxito
+            // parcial antes de encolarse), no viola la PK.
+            await client.from(tableName).upsert(data);
             break;
           case 'update':
             final id = item['record_id'] as String;

@@ -39,6 +39,8 @@ mixin SyncableRepository {
       try {
         await remoteOp();
         await markSynced?.call();
+        // Suprimir el eco de realtime que Supabase emitirá por esta escritura.
+        syncService?.markSelfWrite();
         return;
       } catch (e) {
         debugPrint('❌ [REPO] Error sincronizando $table/$recordId ($operation): $e');

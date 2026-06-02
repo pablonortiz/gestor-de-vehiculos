@@ -71,7 +71,9 @@ class _GestorVehiculosAppState extends ConsumerState<GestorVehiculosApp> {
       if (SupabaseConfig.isConfigured) {
         ref.read(syncServiceProvider.notifier).fullSync();
         DbChangeService.instance.onRemoteChange = () {
-          ref.read(syncServiceProvider.notifier).fullSync();
+          final notifier = ref.read(syncServiceProvider.notifier);
+          // Ignorar el eco de realtime de nuestras propias escrituras recientes.
+          if (!notifier.shouldSuppressRealtimeEcho) notifier.fullSync();
         };
         DbChangeService.instance.startRealtimeSubscription();
       }

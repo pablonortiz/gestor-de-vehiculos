@@ -401,18 +401,34 @@ class DatabaseHelper {
     Map<String, List<Map<String, dynamic>>> tableData,
   ) async {
     final db = await database;
-    await db.transaction((txn) async {
-      for (final table in _deleteOrder) {
-        await txn.delete(table);
-      }
-      final batch = txn.batch();
-      for (final table in _insertOrder) {
-        for (final row in tableData[table] ?? const []) {
-          batch.insert(table, {...row, 'synced': 1});
+    // Desactivamos las foreign keys durante el reemplazo: así el borrado de la
+    // cache (filas synced=1) no dispara ON DELETE CASCADE sobre filas locales
+    // pendientes de subir (synced=0) en tablas hijas, ni el replace de un padre
+    // arrastra a sus hijos. El orden manual mantiene la integridad y al
+    // reactivarlas el estado queda consistente. (PRAGMA no se puede cambiar
+    // dentro de una transacción, por eso va alrededor.)
+    await db.execute('PRAGMA foreign_keys = OFF');
+    try {
+      await db.transaction((txn) async {
+        // Borrar SOLO la cache pura de Supabase (synced=1); preservar lo que
+        // todavía no se subió (synced=0), que de otro modo se perdería.
+        for (final table in _deleteOrder) {
+          await txn.delete(table, where: 'synced = 1');
         }
-      }
-      await batch.commit(noResult: true);
-    });
+        // Insertar/actualizar lo remoto. replace por si una fila pendiente local
+        // ya existe en Supabase (gana la versión remota, ya sincronizada).
+        final batch = txn.batch();
+        for (final table in _insertOrder) {
+          for (final row in tableData[table] ?? const []) {
+            batch.insert(table, {...row, 'synced': 1},
+                conflictAlgorithm: ConflictAlgorithm.replace);
+          }
+        }
+        await batch.commit(noResult: true);
+      });
+    } finally {
+      await db.execute('PRAGMA foreign_keys = ON');
+    }
   }
 
   // Método para reiniciar la base de datos
