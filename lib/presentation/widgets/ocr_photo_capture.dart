@@ -66,6 +66,10 @@ class _OcrPhotoCaptureState extends State<OcrPhotoCapture> {
     _ocrDetected = widget.showOcrIndicator;
   }
 
+  void _safeSetState(VoidCallback fn) {
+    if (mounted) setState(fn);
+  }
+
   @override
   Widget build(BuildContext context) {
     final isReceipt = widget.type == OcrPhotoType.receipt;
@@ -319,7 +323,7 @@ class _OcrPhotoCaptureState extends State<OcrPhotoCapture> {
       );
 
       if (pickedFile == null) {
-        setState(() => _isProcessing = false);
+        _safeSetState(() => _isProcessing = false);
         return;
       }
 
@@ -348,7 +352,7 @@ class _OcrPhotoCaptureState extends State<OcrPhotoCapture> {
 
       if (uploadResult != null) {
         final upload = uploadResult;
-        setState(() {
+        _safeSetState(() {
           _photoUrl = upload.url;
           _ocrText = ocrResult.fullText;
           _ocrDetected = ocrResult.success;
@@ -384,7 +388,7 @@ class _OcrPhotoCaptureState extends State<OcrPhotoCapture> {
           }
         }
       } else {
-        setState(() => _isProcessing = false);
+        _safeSetState(() => _isProcessing = false);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Error al subir la foto')),
@@ -392,7 +396,7 @@ class _OcrPhotoCaptureState extends State<OcrPhotoCapture> {
         }
       }
     } catch (e) {
-      setState(() => _isProcessing = false);
+      _safeSetState(() => _isProcessing = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error: $e')),
@@ -411,7 +415,7 @@ class _OcrPhotoCaptureState extends State<OcrPhotoCapture> {
       );
 
       if (result == null || result.files.isEmpty || result.files.first.path == null) {
-        setState(() => _isProcessing = false);
+        _safeSetState(() => _isProcessing = false);
         return;
       }
 
@@ -438,7 +442,7 @@ class _OcrPhotoCaptureState extends State<OcrPhotoCapture> {
 
       if (uploadResult != null) {
         final upload = uploadResult;
-        setState(() {
+        _safeSetState(() {
           _photoUrl = upload.url;
           _isPdf = upload.isPdf;
           _fileName = upload.fileName;
@@ -454,7 +458,7 @@ class _OcrPhotoCaptureState extends State<OcrPhotoCapture> {
           fileName: upload.fileName,
         ));
       } else {
-        setState(() => _isProcessing = false);
+        _safeSetState(() => _isProcessing = false);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Error al subir el archivo')),
@@ -462,7 +466,7 @@ class _OcrPhotoCaptureState extends State<OcrPhotoCapture> {
         }
       }
     } catch (e) {
-      setState(() => _isProcessing = false);
+      _safeSetState(() => _isProcessing = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error: $e')),

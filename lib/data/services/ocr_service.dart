@@ -32,11 +32,6 @@ class OcrService {
     return _textRecognizer!;
   }
 
-  Future<void> dispose() async {
-    await _textRecognizer?.close();
-    _textRecognizer = null;
-  }
-
   // Extract liters from a pump display photo
   Future<OcrResult> extractLiters(File imageFile) async {
     try {
@@ -88,7 +83,7 @@ class OcrService {
 
       // Standalone decimal fallback: scan all matches, discard date/time-looking
       // values, and pick the most plausible liters reading.
-      final standalonePattern = RegExp(r'\b(\d{1,2}[.,]\d{1,3})\b');
+      final standalonePattern = RegExp(r'\b(\d{1,3}[.,]\d{1,3})\b');
       // Matches dd.mm / hh.mm style tokens (e.g. "12.05", "08.30").
       final dateTimeLike = RegExp(r'^([0-2]?\d|3[01])[.,][0-5]\d$');
 
