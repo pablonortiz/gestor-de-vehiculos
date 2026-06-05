@@ -20,20 +20,27 @@ class _DocumentPhotosSectionState extends ConsumerState<_DocumentPhotosSection> 
 
   @override
   Widget build(BuildContext context) {
+    // Agrupar las fotos por tipo en una sola pasada, en vez de filtrar la lista
+    // completa una vez por cada DocumentType en cada build.
+    final photosByType = <DocumentType, List<DocumentPhoto>>{};
+    for (final photo in widget.photos) {
+      (photosByType[photo.documentType] ??= []).add(photo);
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const _SectionTitle(title: 'Documentos'),
         const SizedBox(height: 12),
-        ...DocumentType.values.map((type) => _buildDocumentTypeSection(type)),
+        ...DocumentType.values.map(
+          (type) => _buildDocumentTypeSection(type, photosByType[type] ?? const []),
+        ),
         const SizedBox(height: 24),
       ],
     );
   }
 
-  Widget _buildDocumentTypeSection(DocumentType type) {
-    final photosForType = widget.photos.where((p) => p.documentType == type).toList();
-
+  Widget _buildDocumentTypeSection(
+      DocumentType type, List<DocumentPhoto> photosForType) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),

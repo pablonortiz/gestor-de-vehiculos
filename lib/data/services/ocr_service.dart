@@ -31,15 +31,9 @@ class OcrService {
   // Rango plausible de litros de una carga.
   static const double _maxPlausibleLiters = 200;
 
-  TextRecognizer? _textRecognizer;
-
-  TextRecognizer get textRecognizer {
-    _textRecognizer ??= TextRecognizer(script: TextRecognitionScript.latin);
-    return _textRecognizer!;
-  }
-
   // Extract liters from a pump display photo
   Future<OcrResult> extractLiters(File imageFile) async {
+    final recognizer = TextRecognizer(script: TextRecognitionScript.latin);
     try {
       debugPrint('OCR: Starting liters extraction from ${imageFile.path}');
 
@@ -49,7 +43,7 @@ class OcrService {
       }
 
       final inputImage = InputImage.fromFile(imageFile);
-      final recognizedText = await textRecognizer.processImage(inputImage);
+      final recognizedText = await recognizer.processImage(inputImage);
       final fullText = recognizedText.text;
 
       debugPrint('OCR Text for liters (${fullText.length} chars): $fullText');
@@ -71,11 +65,14 @@ class OcrService {
       debugPrint('OCR Error extracting liters: $e');
       debugPrint('OCR Stack trace: $stack');
       return OcrResult.failure();
+    } finally {
+      await recognizer.close();
     }
   }
 
   // Extract price from a receipt photo
   Future<OcrResult> extractPrice(File imageFile) async {
+    final recognizer = TextRecognizer(script: TextRecognitionScript.latin);
     try {
       debugPrint('OCR: Starting price extraction from ${imageFile.path}');
 
@@ -85,7 +82,7 @@ class OcrService {
       }
 
       final inputImage = InputImage.fromFile(imageFile);
-      final recognizedText = await textRecognizer.processImage(inputImage);
+      final recognizedText = await recognizer.processImage(inputImage);
       final fullText = recognizedText.text;
 
       debugPrint('OCR Text for price (${fullText.length} chars): $fullText');
@@ -107,6 +104,8 @@ class OcrService {
       debugPrint('OCR Error extracting price: $e');
       debugPrint('OCR Stack trace: $stack');
       return OcrResult.failure();
+    } finally {
+      await recognizer.close();
     }
   }
 
