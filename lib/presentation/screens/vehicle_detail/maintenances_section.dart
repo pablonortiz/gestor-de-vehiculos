@@ -132,6 +132,7 @@ class _MaintenanceFormSheetState extends ConsumerState<_MaintenanceFormSheet> {
   final List<PlatformFile> _pendingFiles = [];
   bool _isSaving = false;
   bool _isSelectingFiles = false;
+  bool _hasChanges = false;
 
   bool get _isEditing => widget.maintenance != null;
 
@@ -147,6 +148,26 @@ class _MaintenanceFormSheetState extends ConsumerState<_MaintenanceFormSheet> {
     _detailController = TextEditingController(text: maintenance?.detail ?? '');
     _selectedDate = maintenance?.date;
     _existingInvoices = List.from(maintenance?.invoices ?? []);
+    _dateController.addListener(_markDirty);
+    _detailController.addListener(_markDirty);
+  }
+
+  void _markDirty() {
+    if (!_hasChanges) _hasChanges = true;
+  }
+
+  Future<void> _attemptClose() async {
+    final dirty = _hasChanges || _pendingFiles.isNotEmpty;
+    if (dirty) {
+      final discard = await confirmDelete(
+        context,
+        title: 'Descartar cambios',
+        message: 'Tenés cambios sin guardar. ¿Querés descartarlos?',
+        confirmLabel: 'Descartar',
+      );
+      if (!discard) return;
+    }
+    if (mounted) Navigator.pop(context);
   }
 
   @override
@@ -180,7 +201,7 @@ class _MaintenanceFormSheetState extends ConsumerState<_MaintenanceFormSheet> {
                     ),
                   ),
                   IconButton(
-                    onPressed: _isSaving ? null : () => Navigator.pop(context),
+                    onPressed: _isSaving ? null : _attemptClose,
                     icon: const Icon(Icons.close),
                   ),
                 ],

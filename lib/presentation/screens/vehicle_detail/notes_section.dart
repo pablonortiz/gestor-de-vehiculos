@@ -131,6 +131,7 @@ class _NoteFormSheetState extends ConsumerState<_NoteFormSheet> {
   final List<PlatformFile> _pendingFiles = [];
   bool _isSaving = false;
   bool _isSelectingPhotos = false;
+  bool _hasChanges = false;
 
   bool get _isEditing => widget.note != null;
 
@@ -139,6 +140,26 @@ class _NoteFormSheetState extends ConsumerState<_NoteFormSheet> {
     super.initState();
     _detailController = TextEditingController(text: widget.note?.detail ?? '');
     _existingPhotos = List.from(widget.note?.photos ?? []);
+    _detailController.addListener(_markDirty);
+  }
+
+  void _markDirty() {
+    if (!_hasChanges) _hasChanges = true;
+  }
+
+  Future<void> _attemptClose() async {
+    final dirty =
+        _hasChanges || _pendingPhotos.isNotEmpty || _pendingFiles.isNotEmpty;
+    if (dirty) {
+      final discard = await confirmDelete(
+        context,
+        title: 'Descartar cambios',
+        message: 'Tenés cambios sin guardar. ¿Querés descartarlos?',
+        confirmLabel: 'Descartar',
+      );
+      if (!discard) return;
+    }
+    if (mounted) Navigator.pop(context);
   }
 
   @override
@@ -171,7 +192,7 @@ class _NoteFormSheetState extends ConsumerState<_NoteFormSheet> {
                     ),
                   ),
                   IconButton(
-                    onPressed: _isSaving ? null : () => Navigator.pop(context),
+                    onPressed: _isSaving ? null : _attemptClose,
                     icon: const Icon(Icons.close),
                   ),
                 ],

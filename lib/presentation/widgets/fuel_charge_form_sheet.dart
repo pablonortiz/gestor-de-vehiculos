@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/confirm_dialog.dart';
 import '../../core/utils/thousands_formatter.dart';
 import '../../domain/models/fuel_charge.dart';
 import '../providers/fuel_charge_provider.dart';
@@ -46,6 +47,7 @@ class _FuelChargeFormSheetState extends ConsumerState<FuelChargeFormSheet> {
   String? _displayFileName;
 
   bool _isSaving = false;
+  bool _hasChanges = false;
 
   @override
   void initState() {
@@ -73,6 +75,34 @@ class _FuelChargeFormSheetState extends ConsumerState<FuelChargeFormSheet> {
     _displayPhotoPublicId = widget.existing?.displayPhotoPublicId;
     _displayIsPdf = widget.existing?.displayIsPdf ?? false;
     _displayFileName = widget.existing?.displayFileName;
+
+    // Los valores iniciales ya están seteados; a partir de acá cualquier edición
+    // de texto marca el form como sucio (para confirmar al cerrar sin guardar).
+    for (final c in [
+      _litersController,
+      _priceController,
+      _odometerController,
+      _notesController,
+    ]) {
+      c.addListener(_markDirty);
+    }
+  }
+
+  void _markDirty() {
+    if (!_hasChanges) _hasChanges = true;
+  }
+
+  Future<void> _attemptClose() async {
+    if (_hasChanges) {
+      final discard = await confirmDelete(
+        context,
+        title: 'Descartar cambios',
+        message: 'Tenés cambios sin guardar. ¿Querés descartarlos?',
+        confirmLabel: 'Descartar',
+      );
+      if (!discard) return;
+    }
+    if (mounted) Navigator.pop(context);
   }
 
   @override
@@ -119,7 +149,7 @@ class _FuelChargeFormSheetState extends ConsumerState<FuelChargeFormSheet> {
                       ),
                     ),
                     IconButton(
-                      onPressed: () => Navigator.pop(context),
+                      onPressed: _attemptClose,
                       icon: const Icon(Icons.close),
                     ),
                   ],
