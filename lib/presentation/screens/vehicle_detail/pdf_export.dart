@@ -485,6 +485,79 @@ class _ReportConfigSheetState extends State<_ReportConfigSheet> {
   }
 }
 
+// Diálogo de progreso reutilizable para los export de PDF.
+void _showPdfProgressDialog(
+    BuildContext context, String title, String subtitle) {
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (ctx) => AlertDialog(
+      backgroundColor: AppTheme.surface,
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const CircularProgressIndicator(),
+          const SizedBox(height: 20),
+          Text(title, style: const TextStyle(color: AppTheme.textPrimary)),
+          const SizedBox(height: 8),
+          Text(
+            subtitle,
+            style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+// Orquesta el flujo común de exportar un PDF: progreso → generar → cerrar
+// diálogo → compartir → feedback. El cierre del diálogo ocurre una sola vez
+// (flag dialogOpen) para que un fallo de sharePdf no saque la pantalla de la pila.
+Future<void> _runPdfExport(
+  BuildContext context, {
+  required String progressTitle,
+  required String progressSubtitle,
+  required Future<Uint8List> Function() generate,
+  required String fileName,
+  required String successMessage,
+  required String errorPrefix,
+}) async {
+  _showPdfProgressDialog(context, progressTitle, progressSubtitle);
+
+  var dialogOpen = true;
+  try {
+    final pdfBytes = await generate();
+
+    if (context.mounted) {
+      Navigator.pop(context);
+      dialogOpen = false;
+    }
+
+    await PdfService.sharePdf(pdfBytes, fileName);
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(successMessage),
+          backgroundColor: AppTheme.success,
+        ),
+      );
+    }
+  } catch (e) {
+    if (dialogOpen && context.mounted) {
+      Navigator.pop(context);
+    }
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$errorPrefix: $e'),
+          backgroundColor: AppTheme.error,
+        ),
+      );
+    }
+  }
+}
+
 // Exportar reporte combinado a PDF
 Future<void> _exportCombinedPdf(
   BuildContext context,
@@ -497,83 +570,34 @@ Future<void> _exportCombinedPdf(
   DateTime startDate,
   DateTime endDate,
   bool ascending,
-) async {
-  showDialog(
-    context: context,
-    barrierDismissible: false,
-    builder: (ctx) => AlertDialog(
-      backgroundColor: AppTheme.surface,
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const CircularProgressIndicator(),
-          const SizedBox(height: 20),
-          const Text(
-            'Generando reporte completo...',
-            style: TextStyle(color: AppTheme.textPrimary),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Preparando datos del vehículo y combustible',
-            style: TextStyle(
-              fontSize: 12,
-              color: AppTheme.textSecondary,
-            ),
-          ),
-        ],
-      ),
-    ),
+) {
+  return _runPdfExport(
+    context,
+    progressTitle: 'Generando reporte completo...',
+    progressSubtitle: 'Preparando datos del vehículo y combustible',
+    fileName: '${vehicle.plate}_completo',
+    successMessage: 'Reporte completo generado exitosamente',
+    errorPrefix: 'Error al generar reporte',
+    generate: () async {
+      final repository = ref.read(fuelChargeRepositoryProvider);
+      final fuelCharges = await repository.getFuelChargesByDateRange(
+        vehicle.id!,
+        startDate,
+        DateTime(endDate.year, endDate.month, endDate.day, 23, 59, 59),
+      );
+      return PdfService.generateCombinedPdf(
+        vehicle: vehicle,
+        photos: photos,
+        documentPhotos: documentPhotos,
+        maintenances: maintenances,
+        notes: notes,
+        fuelCharges: fuelCharges,
+        startDate: startDate,
+        endDate: endDate,
+        ascending: ascending,
+      );
+    },
   );
-
-  var dialogOpen = true;
-  try {
-    final repository = ref.read(fuelChargeRepositoryProvider);
-    final fuelCharges = await repository.getFuelChargesByDateRange(
-      vehicle.id!,
-      startDate,
-      DateTime(endDate.year, endDate.month, endDate.day, 23, 59, 59),
-    );
-
-    final pdfBytes = await PdfService.generateCombinedPdf(
-      vehicle: vehicle,
-      photos: photos,
-      documentPhotos: documentPhotos,
-      maintenances: maintenances,
-      notes: notes,
-      fuelCharges: fuelCharges,
-      startDate: startDate,
-      endDate: endDate,
-      ascending: ascending,
-    );
-
-    if (context.mounted) {
-      Navigator.pop(context);
-      dialogOpen = false;
-    }
-
-    await PdfService.sharePdf(pdfBytes, '${vehicle.plate}_completo');
-
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Reporte completo generado exitosamente'),
-          backgroundColor: AppTheme.success,
-        ),
-      );
-    }
-  } catch (e) {
-    if (dialogOpen && context.mounted) {
-      Navigator.pop(context);
-    }
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error al generar reporte: $e'),
-          backgroundColor: AppTheme.error,
-        ),
-      );
-    }
-  }
 }
 
 // Exportar reporte de combustible a PDF
@@ -584,79 +608,30 @@ Future<void> _exportFuelReport(
   DateTime startDate,
   DateTime endDate,
   bool ascending,
-) async {
-  showDialog(
-    context: context,
-    barrierDismissible: false,
-    builder: (ctx) => AlertDialog(
-      backgroundColor: AppTheme.surface,
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const CircularProgressIndicator(),
-          const SizedBox(height: 20),
-          const Text(
-            'Generando reporte...',
-            style: TextStyle(color: AppTheme.textPrimary),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Preparando reporte de combustible',
-            style: TextStyle(
-              fontSize: 12,
-              color: AppTheme.textSecondary,
-            ),
-          ),
-        ],
-      ),
-    ),
+) {
+  return _runPdfExport(
+    context,
+    progressTitle: 'Generando reporte...',
+    progressSubtitle: 'Preparando reporte de combustible',
+    fileName: '${vehicle.plate}_combustible',
+    successMessage: 'Reporte de combustible generado exitosamente',
+    errorPrefix: 'Error al generar reporte',
+    generate: () async {
+      final repository = ref.read(fuelChargeRepositoryProvider);
+      final fuelCharges = await repository.getFuelChargesByDateRange(
+        vehicle.id!,
+        startDate,
+        DateTime(endDate.year, endDate.month, endDate.day, 23, 59, 59),
+      );
+      return PdfService.generateFuelReportPdf(
+        vehicle: vehicle,
+        fuelCharges: fuelCharges,
+        startDate: startDate,
+        endDate: endDate,
+        ascending: ascending,
+      );
+    },
   );
-
-  var dialogOpen = true;
-  try {
-    final repository = ref.read(fuelChargeRepositoryProvider);
-    final fuelCharges = await repository.getFuelChargesByDateRange(
-      vehicle.id!,
-      startDate,
-      DateTime(endDate.year, endDate.month, endDate.day, 23, 59, 59),
-    );
-
-    final pdfBytes = await PdfService.generateFuelReportPdf(
-      vehicle: vehicle,
-      fuelCharges: fuelCharges,
-      startDate: startDate,
-      endDate: endDate,
-      ascending: ascending,
-    );
-
-    if (context.mounted) {
-      Navigator.pop(context);
-      dialogOpen = false;
-    }
-
-    await PdfService.sharePdf(pdfBytes, '${vehicle.plate}_combustible');
-
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Reporte de combustible generado exitosamente'),
-          backgroundColor: AppTheme.success,
-        ),
-      );
-    }
-  } catch (e) {
-    if (dialogOpen && context.mounted) {
-      Navigator.pop(context);
-    }
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error al generar reporte: $e'),
-          backgroundColor: AppTheme.error,
-        ),
-      );
-    }
-  }
 }
 
 // Exportar vehículo a PDF
@@ -667,74 +642,19 @@ Future<void> _exportPdf(
   List<VehiclePhoto> photos,
   List<DocumentPhoto> documentPhotos,
   List<Maintenance> maintenances,
-) async {
-  // Mostrar diálogo de progreso
-  showDialog(
-    context: context,
-    barrierDismissible: false,
-    builder: (ctx) => AlertDialog(
-      backgroundColor: AppTheme.surface,
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const CircularProgressIndicator(),
-          const SizedBox(height: 20),
-          const Text(
-            'Generando PDF...',
-            style: TextStyle(color: AppTheme.textPrimary),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Descargando imágenes y creando documento',
-            style: TextStyle(
-              fontSize: 12,
-              color: AppTheme.textSecondary,
-            ),
-          ),
-        ],
-      ),
-    ),
-  );
-
-  var dialogOpen = true;
-  try {
-    final pdfBytes = await PdfService.generateVehiclePdf(
+) {
+  return _runPdfExport(
+    context,
+    progressTitle: 'Generando PDF...',
+    progressSubtitle: 'Descargando imágenes y creando documento',
+    fileName: vehicle.plate,
+    successMessage: 'PDF generado exitosamente',
+    errorPrefix: 'Error al generar PDF',
+    generate: () => PdfService.generateVehiclePdf(
       vehicle: vehicle,
       photos: photos,
       documentPhotos: documentPhotos,
       maintenances: maintenances,
-    );
-
-    // Cerrar diálogo de progreso
-    if (context.mounted) {
-      Navigator.pop(context);
-      dialogOpen = false;
-    }
-
-    // Compartir/guardar PDF
-    await PdfService.sharePdf(pdfBytes, vehicle.plate);
-
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('PDF generado exitosamente'),
-          backgroundColor: AppTheme.success,
-        ),
-      );
-    }
-  } catch (e) {
-    // Solo cerrar el diálogo si seguía abierto (si falló sharePdf ya se cerró,
-    // un segundo pop sacaría la pantalla de detalle de la pila).
-    if (dialogOpen && context.mounted) {
-      Navigator.pop(context);
-    }
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error al generar PDF: $e'),
-          backgroundColor: AppTheme.error,
-        ),
-      );
-    }
-  }
+    ),
+  );
 }
