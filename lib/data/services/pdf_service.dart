@@ -1,7 +1,6 @@
 import 'dart:typed_data';
 import 'dart:ui' show Color;
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -15,6 +14,7 @@ import '../../domain/models/maintenance.dart';
 import '../../domain/models/fuel_charge.dart';
 import '../../domain/models/vehicle_note.dart';
 import 'fuel_stats.dart';
+import 'pdf_image_downloader.dart';
 
 class PdfService {
   // Colores del tema para PDF (fondo blanco, amigable para impresión)
@@ -917,53 +917,10 @@ class PdfService {
     );
   }
 
-  static Future<Uint8List?> _downloadImage(String url) async {
-    try {
-      final response = await http
-          .get(Uri.parse(url))
-          .timeout(const Duration(seconds: 20));
-      if (response.statusCode == 200) {
-        return response.bodyBytes;
-      }
-    } catch (e) {
-      debugPrint('🖼️ [PDF] Error descarga imagen: $url -> $e');
-    }
-    return null;
-  }
-
-  /// Descarga un PDF desde una URL y retorna los bytes
-  static Future<Uint8List?> downloadPdfBytes(String url) async {
-    try {
-      debugPrint('📄 [PDF] Descargando: $url');
-      final response = await http
-          .get(Uri.parse(url))
-          .timeout(const Duration(seconds: 20));
-      debugPrint('📄 [PDF] Status: ${response.statusCode}, Size: ${response.bodyBytes.length}');
-      if (response.statusCode == 200 && response.bodyBytes.length > 10) {
-        return response.bodyBytes;
-      }
-      debugPrint('📄 [PDF] Respuesta no válida');
-    } catch (e) {
-      debugPrint('📄 [PDF] Error descarga: $e');
-    }
-    return null;
-  }
-
-  /// Descarga un PDF y lo rasteriza a imágenes PNG
-  static Future<List<Uint8List>> _downloadAndRasterizePdf(String url, {double dpi = 150}) async {
-    try {
-      final pdfBytes = await downloadPdfBytes(url);
-      if (pdfBytes == null) return [];
-
-      final pages = <Uint8List>[];
-      await for (final page in Printing.raster(pdfBytes, dpi: dpi)) {
-        pages.add(await page.toPng());
-      }
-      return pages;
-    } catch (e) {
-      return [];
-    }
-  }
+  /// Descarga un PDF desde una URL y retorna los bytes. Wrapper para los callers
+  /// externos (preview); la implementación vive en PdfImageDownloader.
+  static Future<Uint8List?> downloadPdfBytes(String url) =>
+      PdfImageDownloader.downloadPdfBytes(url);
 
   /// Agrega páginas de un PDF adjunto al documento generado
   static Future<void> _addPdfAttachmentPages(
@@ -971,7 +928,7 @@ class PdfService {
     String cloudinaryUrl,
     String? fileName,
   ) async {
-    final pages = await _downloadAndRasterizePdf(cloudinaryUrl);
+    final pages = await PdfImageDownloader.downloadAndRasterizePdf(cloudinaryUrl);
     if (pages.isNotEmpty) {
       for (int i = 0; i < pages.length; i++) {
         final caption = pages.length > 1
@@ -996,7 +953,7 @@ class PdfService {
     for (int i = 0; i < imageAttachments.length; i += _downloadBatchSize) {
       final batch = imageAttachments.skip(i).take(_downloadBatchSize).toList();
       final results = await Future.wait(
-        batch.map((a) => _downloadImage(a.url)),
+        batch.map((a) => PdfImageDownloader.downloadImage(a.url)),
       );
       for (int j = 0; j < batch.length; j++) {
         batch[j].imageBytes = results[j];
@@ -1488,7 +1445,7 @@ class PdfService {
 
   /// Descarga y rasteriza un PDF externo a imágenes PNG (para preview en la app)
   static Future<List<Uint8List>> rasterizePdfFromUrl(String url, {double dpi = 200}) async {
-    return _downloadAndRasterizePdf(url, dpi: dpi);
+    return PdfImageDownloader.downloadAndRasterizePdf(url, dpi: dpi);
   }
 }
 
