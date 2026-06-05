@@ -14,6 +14,7 @@ import 'core/theme/app_theme.dart';
 import 'core/utils/router.dart';
 import 'data/services/db_change_service.dart';
 import 'data/services/sync_service.dart';
+import 'presentation/widgets/offline_banner.dart';
 
 void main() {
   // Zona guardada: captura cualquier error no manejado (sync y async) que de
@@ -132,7 +133,7 @@ class _GestorVehiculosAppState extends ConsumerState<GestorVehiculosApp> {
           data: MediaQuery.of(context).copyWith(
             textScaler: TextScaler.noScaling,
           ),
-          child: child!,
+          child: OfflineBanner(child: child!),
         );
       },
     );
