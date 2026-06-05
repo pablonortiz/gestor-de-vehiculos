@@ -415,13 +415,17 @@ class DatabaseHelper {
         for (final table in _deleteOrder) {
           await txn.delete(table, where: 'synced = 1');
         }
-        // Insertar/actualizar lo remoto. replace por si una fila pendiente local
-        // ya existe en Supabase (gana la versión remota, ya sincronizada).
+        // Insertar lo remoto con `ignore`: tras el delete solo quedan filas
+        // synced=0 (cambios locales que aún no se subieron, p.ej. por fallo de
+        // red). `ignore` preserva esas filas pendientes en vez de pisarlas con
+        // la versión remota vieja. Los conflictos por edición concurrente ya se
+        // resolvieron por updated_at al subir (_pushUnsynced), que marca synced=1
+        // lo aceptado, de modo que acá no llega como pendiente.
         final batch = txn.batch();
         for (final table in _insertOrder) {
           for (final row in tableData[table] ?? const []) {
             batch.insert(table, {...row, 'synced': 1},
-                conflictAlgorithm: ConflictAlgorithm.replace);
+                conflictAlgorithm: ConflictAlgorithm.ignore);
           }
         }
         await batch.commit(noResult: true);
