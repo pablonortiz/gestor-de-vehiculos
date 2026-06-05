@@ -39,6 +39,8 @@ class _FuelChargesScreenState extends ConsumerState<FuelChargesScreen> {
     final chartDataAsync = ref.watch(fuelChartDataProvider(
       ChartDataParams(vehicleId: widget.vehicleId, months: 6),
     ));
+    final allChargesAsync =
+        ref.watch(fuelChargesByVehicleProvider(widget.vehicleId));
 
     return Scaffold(
       appBar: AppBar(
@@ -98,7 +100,10 @@ class _FuelChargesScreenState extends ConsumerState<FuelChargesScreen> {
                     // Charts section (collapsible)
                     if (_showCharts)
                       chartDataAsync.when(
-                        data: (data) => FuelCharts(data: data),
+                        data: (data) => FuelCharts(
+                          data: data,
+                          charges: allChargesAsync.valueOrNull ?? const [],
+                        ),
                         loading: () => const Padding(
                           padding: EdgeInsets.all(32),
                           child: CircularProgressIndicator(),
