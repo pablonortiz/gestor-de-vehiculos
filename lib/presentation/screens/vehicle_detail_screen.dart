@@ -26,6 +26,7 @@ import '../widgets/vehicle_icon.dart';
 import '../widgets/fuel_summary_card.dart';
 import '../../core/utils/contact_launcher.dart';
 import '../../core/utils/confirm_dialog.dart';
+import '../widgets/error_retry_view.dart';
 
 part 'vehicle_detail/photos_section.dart';
 part 'vehicle_detail/document_photos_section.dart';
@@ -505,7 +506,10 @@ class VehicleDetailScreen extends ConsumerWidget {
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: $e')),
+        error: (e, _) => ErrorRetryView(
+          message: 'No se pudo cargar el vehículo',
+          onRetry: () => ref.invalidate(vehicleByIdProvider(vehicleId)),
+        ),
       ),
     );
   }

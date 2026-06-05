@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
+import '../widgets/error_retry_view.dart';
 import '../../domain/models/fuel_charge.dart';
 import '../providers/fuel_charge_provider.dart';
 import '../widgets/month_navigator.dart';
@@ -88,9 +89,10 @@ class _FuelChargesScreenState extends ConsumerState<FuelChargesScreen> {
                         padding: EdgeInsets.all(32),
                         child: CircularProgressIndicator(),
                       ),
-                      error: (e, _) => Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Text('Error: $e'),
+                      error: (e, _) => ErrorRetryView(
+                        message: 'No se pudo cargar el resumen',
+                        onRetry: () =>
+                            ref.invalidate(fuelChargeSummaryProvider(chargesParams)),
                       ),
                     ),
                     // Charts section (collapsible)
@@ -142,9 +144,10 @@ class _FuelChargesScreenState extends ConsumerState<FuelChargesScreen> {
                         padding: EdgeInsets.all(32),
                         child: CircularProgressIndicator(),
                       ),
-                      error: (e, _) => Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Text('Error: $e'),
+                      error: (e, _) => ErrorRetryView(
+                        message: 'No se pudieron cargar las cargas',
+                        onRetry: () =>
+                            ref.invalidate(fuelChargesByMonthProvider(chargesParams)),
                       ),
                     ),
                     const SizedBox(height: 80), // Space for FAB

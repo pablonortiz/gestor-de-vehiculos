@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/error_retry_view.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/config/supabase_config.dart';
@@ -222,11 +223,9 @@ class HomeScreen extends ConsumerWidget {
                 ),
               ),
               error: (e, _) => SliverToBoxAdapter(
-                child: Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(40),
-                    child: Text('Error: $e'),
-                  ),
+                child: ErrorRetryView(
+                  message: 'No se pudieron cargar las provincias',
+                  onRetry: () => ref.invalidate(vehicleCountByProvinceProvider),
                 ),
               ),
             ),

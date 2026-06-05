@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../widgets/error_retry_view.dart';
 import 'package:intl/intl.dart';
 import '../../core/theme/app_theme.dart';
 import '../providers/vehicle_provider.dart';
@@ -178,7 +179,10 @@ class VehicleHistoryScreen extends ConsumerWidget {
                   );
                 },
                 loading: () => const Center(child: CircularProgressIndicator()),
-                error: (e, _) => Center(child: Text('Error: $e')),
+                error: (e, _) => ErrorRetryView(
+                  message: 'No se pudo cargar el historial',
+                  onRetry: () => ref.invalidate(vehicleHistoryProvider(vehicleId)),
+                ),
               ),
             ),
           ],
