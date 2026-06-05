@@ -8,6 +8,7 @@ import '../../presentation/screens/vehicle_history_screen.dart';
 import '../../presentation/screens/settings_screen.dart';
 import '../../presentation/screens/search_screen.dart';
 import '../../presentation/screens/fuel_charges_screen.dart';
+import '../../presentation/screens/expense_dashboard_screen.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
 final GlobalKey<NavigatorState> _shellNavigatorKey = GlobalKey<NavigatorState>();
@@ -89,6 +90,11 @@ final router = GoRouter(
       path: '/search',
       parentNavigatorKey: _rootNavigatorKey,
       builder: (context, state) => const SearchScreen(),
+    ),
+    GoRoute(
+      path: '/expenses',
+      parentNavigatorKey: _rootNavigatorKey,
+      builder: (context, state) => const ExpenseDashboardScreen(),
     ),
   ],
 );

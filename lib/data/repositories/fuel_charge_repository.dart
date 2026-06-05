@@ -30,6 +30,13 @@ class FuelChargeRepository with SyncableRepository {
     return maps.map((map) => FuelCharge.fromMap(map)).toList();
   }
 
+  // Todas las cargas (para el dashboard de gastos consolidado).
+  Future<List<FuelCharge>> getAllFuelCharges() async {
+    final db = await _dbHelper.database;
+    final maps = await db.query('fuel_charges', orderBy: 'date DESC');
+    return maps.map((map) => FuelCharge.fromMap(map)).toList();
+  }
+
   // Obtener cargas de combustible por mes
   Future<List<FuelCharge>> getFuelChargesByMonth(
     String vehicleId,

@@ -18,6 +18,14 @@ class MaintenanceRepository with SyncableRepository {
   @override
   SyncService? get syncService => _syncService;
 
+  // Todos los mantenimientos (para el dashboard de gastos; sin sus facturas,
+  // que no hacen falta para el costo).
+  Future<List<Maintenance>> getAllMaintenances() async {
+    final db = await _dbHelper.database;
+    final maps = await db.query('maintenances', orderBy: 'date DESC');
+    return maps.map((map) => Maintenance.fromMap(map)).toList();
+  }
+
   // Obtener mantenimientos de un vehículo
   Future<List<Maintenance>> getMaintenancesByVehicle(String vehicleId) async {
     final db = await _dbHelper.database;

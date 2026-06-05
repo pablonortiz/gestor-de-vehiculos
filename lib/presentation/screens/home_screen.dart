@@ -70,6 +70,12 @@ class HomeScreen extends ConsumerWidget {
                         ),
                         Row(
                           children: [
+                            IconButton(
+                              onPressed: () => context.push('/expenses'),
+                              icon: const Icon(Icons.payments_outlined,
+                                  color: AppTheme.accentPrimary),
+                              tooltip: 'Gastos',
+                            ),
                             // Indicador de sincronización
                             if (syncState.status == SyncStatus.syncing)
                               Container(
