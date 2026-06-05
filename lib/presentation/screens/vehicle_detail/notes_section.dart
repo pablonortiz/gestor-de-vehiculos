@@ -249,6 +249,7 @@ class _NoteFormSheetState extends ConsumerState<_NoteFormSheet> {
                                 onTap: () async {
                                   final noteRepo = ref.read(noteRepositoryProvider);
                                   await noteRepo.deletePhoto(photo.id!);
+                                  if (!mounted) return;
                                   setState(() {
                                     _existingPhotos.remove(photo);
                                   });

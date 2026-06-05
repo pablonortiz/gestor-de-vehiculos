@@ -282,6 +282,7 @@ class _MaintenanceFormSheetState extends ConsumerState<_MaintenanceFormSheet> {
                       onDeleted: _isSaving ? null : () async {
                         final maintenanceRepo = ref.read(maintenanceRepositoryProvider);
                         await maintenanceRepo.deleteInvoice(invoice.id!);
+                        if (!mounted) return;
                         setState(() {
                           _existingInvoices.remove(invoice);
                         });

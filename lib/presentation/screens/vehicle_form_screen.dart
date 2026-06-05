@@ -79,6 +79,7 @@ class _VehicleFormScreenState extends ConsumerState<VehicleFormScreen> {
 
   Future<void> _loadVehicle() async {
     final vehicle = await ref.read(vehicleByIdProvider(widget.vehicleId!).future);
+    if (!mounted) return;
     if (vehicle != null) {
       setState(() {
         _plateController.text = vehicle.plate;
@@ -147,6 +148,7 @@ class _VehicleFormScreenState extends ConsumerState<VehicleFormScreen> {
 
     if (fullContact == null) return;
 
+    if (!mounted) return;
     setState(() {
       // Nombre
       _responsibleNameController.text = fullContact.displayName;
