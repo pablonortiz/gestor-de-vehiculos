@@ -15,6 +15,7 @@ import '../widgets/vehicle_icon.dart';
 import '../widgets/city_autocomplete.dart';
 import '../widgets/lugar_autocomplete.dart';
 import '../../core/utils/confirm_dialog.dart';
+import '../../core/utils/thousands_formatter.dart';
 
 class VehicleFormScreen extends ConsumerStatefulWidget {
   final String? vehicleId;
@@ -129,7 +130,7 @@ class _VehicleFormScreenState extends ConsumerState<VehicleFormScreen> {
         _brandController.text = vehicle.brand;
         _modelController.text = vehicle.model;
         _yearController.text = vehicle.year.toString();
-        _kmController.text = vehicle.km.toString();
+        _kmController.text = formatWithDots(vehicle.km.toString());
         _insuranceCompanyController.text = vehicle.insuranceCompany ?? '';
         _cityController.text = vehicle.city;
         _lugarController.text = vehicle.lugar ?? '';
@@ -298,6 +299,7 @@ class _VehicleFormScreenState extends ConsumerState<VehicleFormScreen> {
       const SizedBox(height: 8),
       TextFormField(
         controller: _plateController,
+        autofocus: !_isEditing,
         textCapitalization: TextCapitalization.characters,
         decoration: const InputDecoration(
           hintText: 'Ej: AA123BB',
@@ -420,7 +422,7 @@ class _VehicleFormScreenState extends ConsumerState<VehicleFormScreen> {
                     suffixText: 'km',
                   ),
                   inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly,
+                    ThousandsSeparatorFormatter(),
                   ],
                 ),
               ],
@@ -750,7 +752,7 @@ class _VehicleFormScreenState extends ConsumerState<VehicleFormScreen> {
         model: _modelController.text.trim(),
         year: int.tryParse(_yearController.text) ?? DateTime.now().year,
         color: _selectedColor,
-        km: int.tryParse(_kmController.text) ?? 0,
+        km: int.tryParse(_kmController.text.replaceAll('.', '')) ?? 0,
         vtvExpiry: _vtvExpiry,
         insuranceCompany: _insuranceCompanyController.text.trim().isEmpty
             ? null
