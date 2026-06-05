@@ -14,6 +14,7 @@ import '../../domain/models/document_photo.dart';
 import '../../domain/models/maintenance.dart';
 import '../../domain/models/fuel_charge.dart';
 import '../../domain/models/vehicle_note.dart';
+import 'fuel_stats.dart';
 
 class PdfService {
   // Colores del tema para PDF (fondo blanco, amigable para impresión)
@@ -1029,7 +1030,7 @@ class PdfService {
   static void _addFuelSummaryPage(
     pw.Document pdf,
     Vehicle vehicle,
-    _FuelStats stats,
+    FuelStats stats,
     DateTime startDate,
     DateTime endDate,
     bool ascending, {
@@ -1185,7 +1186,7 @@ class PdfService {
   }
 
   /// Agrega las páginas de la tabla de cargas de combustible.
-  static void _addFuelTablePages(pw.Document pdf, _FuelStats stats) {
+  static void _addFuelTablePages(pw.Document pdf, FuelStats stats) {
     final sortedCharges = stats.sortedCharges;
     if (sortedCharges.isEmpty) return;
 
@@ -1346,7 +1347,7 @@ class PdfService {
       ),
     );
 
-    final stats = _FuelStats.from(fuelCharges, ascending);
+    final stats = FuelStats.from(fuelCharges, ascending);
 
     // Page 1: Header + Vehicle Info + Summary Stats
     _addFuelSummaryPage(
@@ -1460,7 +1461,7 @@ class PdfService {
     }
 
     // ===== PARTE 2: REPORTE DE COMBUSTIBLE =====
-    final stats = _FuelStats.from(fuelCharges, ascending);
+    final stats = FuelStats.from(fuelCharges, ascending);
 
     // Fuel summary page
     _addFuelSummaryPage(
@@ -1515,53 +1516,3 @@ class _Attachment {
   });
 }
 
-/// Estadísticas agregadas del período de combustible.
-class _FuelStats {
-  final List<FuelCharge> sortedCharges;
-  final double totalLiters;
-  final double totalPrice;
-  final double avgPricePerLiter;
-  final double avgLitersPerCharge;
-  final String? avgKmBetweenCharges;
-
-  _FuelStats._({
-    required this.sortedCharges,
-    required this.totalLiters,
-    required this.totalPrice,
-    required this.avgPricePerLiter,
-    required this.avgLitersPerCharge,
-    required this.avgKmBetweenCharges,
-  });
-
-  factory _FuelStats.from(List<FuelCharge> fuelCharges, bool ascending) {
-    final numberFormat = NumberFormat('#,###');
-
-    final sortedCharges = List<FuelCharge>.from(fuelCharges);
-    sortedCharges.sort((a, b) => ascending
-        ? a.date.compareTo(b.date)
-        : b.date.compareTo(a.date));
-
-    final totalLiters = sortedCharges.fold<double>(0, (sum, c) => sum + c.liters);
-    final totalPrice = sortedCharges.fold<double>(0, (sum, c) => sum + c.price);
-    final avgPricePerLiter = totalLiters > 0 ? totalPrice / totalLiters : 0.0;
-    final avgLitersPerCharge = sortedCharges.isNotEmpty ? totalLiters / sortedCharges.length : 0.0;
-
-    String? avgKmBetweenCharges;
-    final chargesWithOdometer = sortedCharges.where((c) => c.odometer != null).toList();
-    chargesWithOdometer.sort((a, b) => a.date.compareTo(b.date));
-    if (chargesWithOdometer.length >= 2) {
-      final totalKm = chargesWithOdometer.last.odometer! - chargesWithOdometer.first.odometer!;
-      final avgKm = totalKm / (chargesWithOdometer.length - 1);
-      avgKmBetweenCharges = '${numberFormat.format(avgKm.round())} km';
-    }
-
-    return _FuelStats._(
-      sortedCharges: sortedCharges,
-      totalLiters: totalLiters,
-      totalPrice: totalPrice,
-      avgPricePerLiter: avgPricePerLiter,
-      avgLitersPerCharge: avgLitersPerCharge,
-      avgKmBetweenCharges: avgKmBetweenCharges,
-    );
-  }
-}
