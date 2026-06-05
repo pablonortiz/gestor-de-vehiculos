@@ -47,13 +47,33 @@ class PhotoRepository with SyncableRepository {
     final db = await _dbHelper.database;
     final id = _uuid.v4();
 
-    final existingPhotos = await getPhotosByVehicle(photo.vehicleId);
-    final shouldBePrimary = existingPhotos.isEmpty || photo.isPrimary;
-    // Insertamos como primaria SOLO si es la primera foto (no hay otra que
-    // desmarcar). Si hay otras y debe ser primaria, lo resuelve setPrimaryPhoto
-    // más abajo, que marca synced=0 y encola el unset de la primaria anterior
-    // (offline-safe). Así evitamos dejar dos primarias tras un fullSync.
-    final insertAsPrimary = existingPhotos.isEmpty;
+    // Determinamos is_primary e insertamos dentro de una transacción: así dos
+    // inserts concurrentes sobre un vehículo sin fotos no quedan ambos como
+    // primaria (sqflite serializa las transacciones). Insertamos como primaria
+    // SOLO si es la primera foto; si hay otras y debe ser primaria, lo resuelve
+    // setPrimaryPhoto más abajo (offline-safe), evitando dos primarias tras sync.
+    final (insertAsPrimary, hadOthers) =
+        await db.transaction<(bool, bool)>((txn) async {
+      final existing = await txn.query(
+        'vehicle_photos',
+        columns: ['id'],
+        where: 'vehicle_id = ?',
+        whereArgs: [photo.vehicleId],
+      );
+      final isPrimary = existing.isEmpty;
+      final map = VehiclePhoto(
+        id: id,
+        vehicleId: photo.vehicleId,
+        cloudinaryUrl: photo.cloudinaryUrl,
+        cloudinaryPublicId: photo.cloudinaryPublicId,
+        isPrimary: isPrimary,
+        isPdf: photo.isPdf,
+        fileName: photo.fileName,
+      ).toMap();
+      map['synced'] = 0;
+      await txn.insert('vehicle_photos', map);
+      return (isPrimary, existing.isNotEmpty);
+    });
 
     final newPhoto = VehiclePhoto(
       id: id,
@@ -64,11 +84,6 @@ class PhotoRepository with SyncableRepository {
       isPdf: photo.isPdf,
       fileName: photo.fileName,
     );
-
-    final map = newPhoto.toMap();
-    map['synced'] = 0;
-
-    await db.insert('vehicle_photos', map);
 
     // Sincronizar el INSERT de la foto nueva.
     await pushWrite(
@@ -84,8 +99,8 @@ class PhotoRepository with SyncableRepository {
       },
     );
 
-    // Promover a primaria correctamente si corresponde y había otras fotos.
-    if (shouldBePrimary && existingPhotos.isNotEmpty) {
+    // Promover a primaria si el caller lo pidió y ya había otras fotos.
+    if (photo.isPrimary && hadOthers) {
       await setPrimaryPhoto(id, photo.vehicleId);
     }
 

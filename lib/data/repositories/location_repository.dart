@@ -131,11 +131,18 @@ class LocationRepository with SyncableRepository {
     final existing = await findCityByName(provinceId, name);
     if (existing != null) return existing;
 
-    // Create new city
-    return await insertCity(City(
-      provinceId: provinceId,
-      name: name,
-    ));
+    try {
+      return await insertCity(City(
+        provinceId: provinceId,
+        name: name,
+      ));
+    } catch (e) {
+      // Race con otra llamada concurrente que la creó entre el find y el insert
+      // (viola el UNIQUE province_id+name_normalized): re-buscamos.
+      final raced = await findCityByName(provinceId, name);
+      if (raced != null) return raced;
+      rethrow;
+    }
   }
 
   /// Insert a new city
@@ -311,11 +318,18 @@ class LocationRepository with SyncableRepository {
     final existing = await findLugarByName(cityId, name);
     if (existing != null) return existing;
 
-    // Create new lugar
-    return await insertLugar(Lugar(
-      cityId: cityId,
-      name: name,
-    ));
+    try {
+      return await insertLugar(Lugar(
+        cityId: cityId,
+        name: name,
+      ));
+    } catch (e) {
+      // Race con otra llamada concurrente que lo creó entre el find y el insert
+      // (viola el UNIQUE city_id+name_normalized): re-buscamos.
+      final raced = await findLugarByName(cityId, name);
+      if (raced != null) return raced;
+      rethrow;
+    }
   }
 
   /// Insert a new lugar
