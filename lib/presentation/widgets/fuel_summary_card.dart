@@ -3,12 +3,17 @@ import 'package:intl/intl.dart';
 import '../../core/theme/app_theme.dart';
 import '../../domain/models/fuel_charge.dart';
 
+/// Resumen mensual de combustible. Dos variantes:
+/// - completa (default): 4 KPIs con divisores, usada en la pantalla dedicada.
+/// - [compact]: 3 KPIs, estilo más sutil y sin margen, para la sección del detalle.
 class FuelSummaryCard extends StatelessWidget {
   final FuelChargeSummary summary;
+  final bool compact;
 
   const FuelSummaryCard({
     super.key,
     required this.summary,
+    this.compact = false,
   });
 
   @override
@@ -19,30 +24,28 @@ class FuelSummaryCard extends StatelessWidget {
       decimalDigits: 0,
     );
 
-    final pricePerLiterFormat = NumberFormat.currency(
-      locale: 'es_AR',
-      symbol: '\$',
-      decimalDigits: 0,
-    );
-
     return Container(
-      margin: const EdgeInsets.all(16),
+      margin: compact ? EdgeInsets.zero : const EdgeInsets.all(16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            AppTheme.accentPrimary.withOpacity(0.15),
-            AppTheme.accentDark.withOpacity(0.1),
+            AppTheme.accentPrimary.withOpacity(compact ? 0.1 : 0.15),
+            AppTheme.accentDark.withOpacity(compact ? 0.05 : 0.1),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.accentPrimary.withOpacity(0.3)),
+        borderRadius: BorderRadius.circular(compact ? 12 : 16),
+        border: Border.all(
+          color: AppTheme.accentPrimary.withOpacity(compact ? 0.2 : 0.3),
+        ),
       ),
       child: summary.chargeCount == 0
           ? _buildEmptyState()
-          : _buildSummaryContent(currencyFormat, pricePerLiterFormat),
+          : (compact
+              ? _buildCompactContent(currencyFormat)
+              : _buildFullContent(currencyFormat)),
     );
   }
 
@@ -61,10 +64,7 @@ class FuelSummaryCard extends StatelessWidget {
     );
   }
 
-  Widget _buildSummaryContent(
-    NumberFormat currencyFormat,
-    NumberFormat pricePerLiterFormat,
-  ) {
+  Widget _buildFullContent(NumberFormat currencyFormat) {
     return Row(
       children: [
         Expanded(
@@ -74,11 +74,7 @@ class FuelSummaryCard extends StatelessWidget {
             value: '${summary.totalLiters.toStringAsFixed(1)} L',
           ),
         ),
-        Container(
-          width: 1,
-          height: 40,
-          color: AppTheme.border,
-        ),
+        _divider(40),
         Expanded(
           child: _SummaryItem(
             icon: Icons.attach_money,
@@ -86,23 +82,15 @@ class FuelSummaryCard extends StatelessWidget {
             value: currencyFormat.format(summary.totalPrice),
           ),
         ),
-        Container(
-          width: 1,
-          height: 40,
-          color: AppTheme.border,
-        ),
+        _divider(40),
         Expanded(
           child: _SummaryItem(
             icon: Icons.trending_up,
             label: 'Promedio',
-            value: '${pricePerLiterFormat.format(summary.averagePricePerLiter)}/L',
+            value: '${currencyFormat.format(summary.averagePricePerLiter)}/L',
           ),
         ),
-        Container(
-          width: 1,
-          height: 40,
-          color: AppTheme.border,
-        ),
+        _divider(40),
         Expanded(
           child: _SummaryItem(
             icon: Icons.format_list_numbered,
@@ -113,17 +101,53 @@ class FuelSummaryCard extends StatelessWidget {
       ],
     );
   }
+
+  Widget _buildCompactContent(NumberFormat currencyFormat) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceAround,
+      children: [
+        _SummaryItem(
+          icon: Icons.local_gas_station,
+          label: 'Este mes',
+          value: '${summary.totalLiters.toStringAsFixed(1)} L',
+          compact: true,
+        ),
+        _divider(30),
+        _SummaryItem(
+          icon: Icons.attach_money,
+          label: 'Gastado',
+          value: currencyFormat.format(summary.totalPrice),
+          compact: true,
+        ),
+        _divider(30),
+        _SummaryItem(
+          icon: Icons.trending_up,
+          label: 'Promedio',
+          value: '${currencyFormat.format(summary.averagePricePerLiter)}/L',
+          compact: true,
+        ),
+      ],
+    );
+  }
+
+  Widget _divider(double height) => Container(
+        width: 1,
+        height: height,
+        color: AppTheme.border,
+      );
 }
 
 class _SummaryItem extends StatelessWidget {
   final IconData icon;
   final String label;
   final String value;
+  final bool compact;
 
   const _SummaryItem({
     required this.icon,
     required this.label,
     required this.value,
+    this.compact = false,
   });
 
   @override
@@ -131,12 +155,12 @@ class _SummaryItem extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, color: AppTheme.accentPrimary, size: 20),
+        Icon(icon, color: AppTheme.accentPrimary, size: compact ? 18 : 20),
         const SizedBox(height: 4),
         Text(
           value,
-          style: const TextStyle(
-            fontSize: 13,
+          style: TextStyle(
+            fontSize: compact ? 12 : 13,
             fontWeight: FontWeight.w600,
             color: AppTheme.textPrimary,
           ),

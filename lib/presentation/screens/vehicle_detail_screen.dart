@@ -23,6 +23,7 @@ import '../../data/services/pdf_service.dart';
 import '../providers/vehicle_provider.dart';
 import '../providers/fuel_charge_provider.dart';
 import '../widgets/vehicle_icon.dart';
+import '../widgets/fuel_summary_card.dart';
 
 part 'vehicle_detail/photos_section.dart';
 part 'vehicle_detail/document_photos_section.dart';

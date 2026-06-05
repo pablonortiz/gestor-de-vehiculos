@@ -53,60 +53,9 @@ class _FuelChargesSectionState extends ConsumerState<_FuelChargesSection> {
         ),
         const SizedBox(height: 12),
 
-        // Monthly summary card
+        // Monthly summary card (variante compacta del widget compartido)
         summaryAsync.when(
-          data: (summary) => Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  AppTheme.accentPrimary.withOpacity(0.1),
-                  AppTheme.accentDark.withOpacity(0.05),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppTheme.accentPrimary.withOpacity(0.2)),
-            ),
-            child: summary.chargeCount == 0
-                ? const Center(
-                    child: Text(
-                      'Sin cargas este mes',
-                      style: TextStyle(color: AppTheme.textSecondary),
-                    ),
-                  )
-                : Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      _FuelSummaryItem(
-                        icon: Icons.local_gas_station,
-                        value: '${summary.totalLiters.toStringAsFixed(1)} L',
-                        label: 'Este mes',
-                      ),
-                      Container(
-                        width: 1,
-                        height: 30,
-                        color: AppTheme.border,
-                      ),
-                      _FuelSummaryItem(
-                        icon: Icons.attach_money,
-                        value: currencyFormat.format(summary.totalPrice),
-                        label: 'Gastado',
-                      ),
-                      Container(
-                        width: 1,
-                        height: 30,
-                        color: AppTheme.border,
-                      ),
-                      _FuelSummaryItem(
-                        icon: Icons.trending_up,
-                        value: '${currencyFormat.format(summary.averagePricePerLiter)}/L',
-                        label: 'Promedio',
-                      ),
-                    ],
-                  ),
-          ),
+          data: (summary) => FuelSummaryCard(summary: summary, compact: true),
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (_, __) => const SizedBox.shrink(),
         ),
@@ -184,40 +133,3 @@ class _FuelChargesSectionState extends ConsumerState<_FuelChargesSection> {
   }
 }
 
-class _FuelSummaryItem extends StatelessWidget {
-  final IconData icon;
-  final String value;
-  final String label;
-
-  const _FuelSummaryItem({
-    required this.icon,
-    required this.value,
-    required this.label,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, color: AppTheme.accentPrimary, size: 18),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: AppTheme.textPrimary,
-          ),
-        ),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 10,
-            color: AppTheme.textSecondary,
-          ),
-        ),
-      ],
-    );
-  }
-}
