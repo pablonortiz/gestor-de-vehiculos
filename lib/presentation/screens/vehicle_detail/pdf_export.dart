@@ -525,6 +525,7 @@ Future<void> _exportCombinedPdf(
     ),
   );
 
+  var dialogOpen = true;
   try {
     final repository = ref.read(fuelChargeRepositoryProvider);
     final fuelCharges = await repository.getFuelChargesByDateRange(
@@ -547,6 +548,7 @@ Future<void> _exportCombinedPdf(
 
     if (context.mounted) {
       Navigator.pop(context);
+      dialogOpen = false;
     }
 
     await PdfService.sharePdf(pdfBytes, '${vehicle.plate}_completo');
@@ -560,8 +562,10 @@ Future<void> _exportCombinedPdf(
       );
     }
   } catch (e) {
-    if (context.mounted) {
+    if (dialogOpen && context.mounted) {
       Navigator.pop(context);
+    }
+    if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error al generar reporte: $e'),
@@ -608,6 +612,7 @@ Future<void> _exportFuelReport(
     ),
   );
 
+  var dialogOpen = true;
   try {
     final repository = ref.read(fuelChargeRepositoryProvider);
     final fuelCharges = await repository.getFuelChargesByDateRange(
@@ -626,6 +631,7 @@ Future<void> _exportFuelReport(
 
     if (context.mounted) {
       Navigator.pop(context);
+      dialogOpen = false;
     }
 
     await PdfService.sharePdf(pdfBytes, '${vehicle.plate}_combustible');
@@ -639,8 +645,10 @@ Future<void> _exportFuelReport(
       );
     }
   } catch (e) {
-    if (context.mounted) {
+    if (dialogOpen && context.mounted) {
       Navigator.pop(context);
+    }
+    if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error al generar reporte: $e'),
@@ -688,6 +696,7 @@ Future<void> _exportPdf(
     ),
   );
 
+  var dialogOpen = true;
   try {
     final pdfBytes = await PdfService.generateVehiclePdf(
       vehicle: vehicle,
@@ -699,6 +708,7 @@ Future<void> _exportPdf(
     // Cerrar diálogo de progreso
     if (context.mounted) {
       Navigator.pop(context);
+      dialogOpen = false;
     }
 
     // Compartir/guardar PDF
@@ -713,9 +723,12 @@ Future<void> _exportPdf(
       );
     }
   } catch (e) {
-    // Cerrar diálogo de progreso si aún está abierto
-    if (context.mounted) {
+    // Solo cerrar el diálogo si seguía abierto (si falló sharePdf ya se cerró,
+    // un segundo pop sacaría la pantalla de detalle de la pila).
+    if (dialogOpen && context.mounted) {
       Navigator.pop(context);
+    }
+    if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error al generar PDF: $e'),
