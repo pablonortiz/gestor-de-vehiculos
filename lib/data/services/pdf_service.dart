@@ -32,13 +32,7 @@ class PdfService {
     required List<DocumentPhoto> documentPhotos,
     required List<Maintenance> maintenances,
   }) async {
-    final pdf = pw.Document(
-      theme: pw.ThemeData.withFont(
-        base: await PdfGoogleFonts.robotoRegular(),
-        bold: await PdfGoogleFonts.robotoBold(),
-        italic: await PdfGoogleFonts.robotoItalic(),
-      ),
-    );
+    final pdf = await _createDocument();
 
     // Recolectar y descargar (en paralelo) todas las imágenes antes de armar las páginas.
     final photoAttachments = _photoAttachments(photos);
@@ -912,6 +906,17 @@ class PdfService {
   }
 
   /// Descarga una imagen desde URL
+  // Documento PDF con la fuente Roboto (base/bold/italic) ya configurada.
+  static Future<pw.Document> _createDocument() async {
+    return pw.Document(
+      theme: pw.ThemeData.withFont(
+        base: await PdfGoogleFonts.robotoRegular(),
+        bold: await PdfGoogleFonts.robotoBold(),
+        italic: await PdfGoogleFonts.robotoItalic(),
+      ),
+    );
+  }
+
   static Future<Uint8List?> _downloadImage(String url) async {
     try {
       final response = await http
@@ -1339,13 +1344,7 @@ class PdfService {
     required DateTime endDate,
     required bool ascending,
   }) async {
-    final pdf = pw.Document(
-      theme: pw.ThemeData.withFont(
-        base: await PdfGoogleFonts.robotoRegular(),
-        bold: await PdfGoogleFonts.robotoBold(),
-        italic: await PdfGoogleFonts.robotoItalic(),
-      ),
-    );
+    final pdf = await _createDocument();
 
     final stats = FuelStats.from(fuelCharges, ascending);
 
@@ -1405,13 +1404,7 @@ class PdfService {
     required DateTime endDate,
     required bool ascending,
   }) async {
-    final pdf = pw.Document(
-      theme: pw.ThemeData.withFont(
-        base: await PdfGoogleFonts.robotoRegular(),
-        bold: await PdfGoogleFonts.robotoBold(),
-        italic: await PdfGoogleFonts.robotoItalic(),
-      ),
-    );
+    final pdf = await _createDocument();
 
     final dateFormat = DateFormat('dd/MM/yyyy');
 
