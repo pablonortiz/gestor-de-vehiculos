@@ -6,6 +6,7 @@ import '../../data/repositories/note_repository.dart';
 import '../../data/repositories/photo_repository.dart';
 import '../../data/services/db_change_service.dart';
 import '../../data/services/sync_service.dart';
+import '../../data/services/notification_service.dart';
 import '../../domain/models/vehicle.dart';
 import '../../domain/models/vehicle_history.dart';
 import '../../domain/models/maintenance.dart';
@@ -152,7 +153,10 @@ class VehicleNotifier extends StateNotifier<AsyncValue<List<Vehicle>>> {
 
   Future<String?> addVehicle(Vehicle vehicle) async {
     try {
-      return await _repository.insertVehicle(vehicle);
+      final id = await _repository.insertVehicle(vehicle);
+      await NotificationService.instance
+          .scheduleForVehicle(vehicle.copyWith(id: id));
+      return id;
     } catch (e) {
       return null;
     }
@@ -161,6 +165,7 @@ class VehicleNotifier extends StateNotifier<AsyncValue<List<Vehicle>>> {
   Future<bool> updateVehicle(Vehicle vehicle) async {
     try {
       await _repository.updateVehicle(vehicle);
+      await NotificationService.instance.scheduleForVehicle(vehicle);
       return true;
     } catch (e) {
       return false;
@@ -170,6 +175,7 @@ class VehicleNotifier extends StateNotifier<AsyncValue<List<Vehicle>>> {
   Future<bool> deleteVehicle(String id) async {
     try {
       await _repository.deleteVehicle(id);
+      await NotificationService.instance.cancelForVehicle(id);
       return true;
     } catch (e) {
       return false;

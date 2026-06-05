@@ -13,7 +13,10 @@
     
     <!-- Permisos para contactos -->
     <uses-permission android:name="android.permission.READ_CONTACTS"/>
-    
+
+    <!-- Notificaciones locales (recordatorios de vencimiento de VTV/seguro) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+
     <application
         android:label="Gestor de vehículos"
         android:name="${applicationName}"

@@ -14,6 +14,8 @@ import 'core/theme/app_theme.dart';
 import 'core/utils/router.dart';
 import 'data/services/db_change_service.dart';
 import 'data/services/sync_service.dart';
+import 'data/services/notification_service.dart';
+import 'presentation/providers/vehicle_provider.dart';
 import 'presentation/widgets/offline_banner.dart';
 
 void main() {
@@ -98,7 +100,17 @@ class _GestorVehiculosAppState extends ConsumerState<GestorVehiculosApp> {
   void initState() {
     super.initState();
     // Sincronizar datos y suscribirse a cambios en tiempo real
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      // Recordatorios de vencimiento (VTV/seguro): pedir permiso y reprogramar
+      // con los vehículos en cache (un reinicio del teléfono borra lo agendado).
+      await NotificationService.instance.requestPermission();
+      try {
+        final vehicles = await ref.read(vehiclesProvider.future);
+        await NotificationService.instance.syncAll(vehicles);
+      } catch (_) {
+        // Sin vehículos cargados todavía; se reprograma al crear/editar.
+      }
+
       if (SupabaseConfig.isConfigured) {
         ref.read(syncServiceProvider.notifier).fullSync();
         DbChangeService.instance.onRemoteChange = () {
