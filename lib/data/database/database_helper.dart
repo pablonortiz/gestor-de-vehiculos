@@ -19,7 +19,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 5,
+      version: 6,
       onConfigure: _onConfigure,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
@@ -132,6 +132,11 @@ class DatabaseHelper {
       await db.execute('ALTER TABLE fuel_charges ADD COLUMN display_is_pdf INTEGER NOT NULL DEFAULT 0');
       await db.execute('ALTER TABLE fuel_charges ADD COLUMN display_file_name TEXT');
     }
+
+    if (oldVersion < 6) {
+      // Costo opcional de mantenimiento (para el dashboard de gastos #Ft3).
+      await db.execute('ALTER TABLE maintenances ADD COLUMN cost REAL');
+    }
   }
 
   Future<void> _createDB(Database db, int version) async {
@@ -212,6 +217,7 @@ class DatabaseHelper {
         vehicle_id TEXT NOT NULL,
         date INTEGER NOT NULL,
         detail TEXT NOT NULL,
+        cost REAL,
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL,
         synced INTEGER NOT NULL DEFAULT 1,

@@ -128,6 +128,7 @@ class _MaintenanceFormSheetState extends ConsumerState<_MaintenanceFormSheet> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _dateController;
   late final TextEditingController _detailController;
+  late final TextEditingController _costController;
   late DateTime? _selectedDate;
   late List<MaintenanceInvoice> _existingInvoices;
   final List<PlatformFile> _pendingFiles = [];
@@ -147,10 +148,16 @@ class _MaintenanceFormSheetState extends ConsumerState<_MaintenanceFormSheet> {
           : '',
     );
     _detailController = TextEditingController(text: maintenance?.detail ?? '');
+    _costController = TextEditingController(
+      text: maintenance?.cost != null
+          ? formatWithDots(maintenance!.cost!.toStringAsFixed(0))
+          : '',
+    );
     _selectedDate = maintenance?.date;
     _existingInvoices = List.from(maintenance?.invoices ?? []);
     _dateController.addListener(_markDirty);
     _detailController.addListener(_markDirty);
+    _costController.addListener(_markDirty);
   }
 
   void _markDirty() {
@@ -175,6 +182,7 @@ class _MaintenanceFormSheetState extends ConsumerState<_MaintenanceFormSheet> {
   void dispose() {
     _dateController.dispose();
     _detailController.dispose();
+    _costController.dispose();
     super.dispose();
   }
 
@@ -245,6 +253,18 @@ class _MaintenanceFormSheetState extends ConsumerState<_MaintenanceFormSheet> {
                 ),
                 validator: (v) =>
                     (v == null || v.trim().isEmpty) ? 'Completá el detalle' : null,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _costController,
+                keyboardType: TextInputType.number,
+                enabled: !_isSaving,
+                inputFormatters: [ThousandsSeparatorFormatter()],
+                decoration: const InputDecoration(
+                  labelText: 'Costo',
+                  prefixText: '\$ ',
+                  hintText: 'Opcional',
+                ),
               ),
               const SizedBox(height: 16),
               Row(
@@ -393,6 +413,9 @@ class _MaintenanceFormSheetState extends ConsumerState<_MaintenanceFormSheet> {
 
     try {
       final maintenanceRepo = ref.read(maintenanceRepositoryProvider);
+      final cost = _costController.text.trim().isEmpty
+          ? null
+          : double.tryParse(_costController.text.replaceAll('.', ''));
       String maintenanceId;
 
       if (_isEditing) {
@@ -400,6 +423,7 @@ class _MaintenanceFormSheetState extends ConsumerState<_MaintenanceFormSheet> {
           widget.maintenance!.copyWith(
             date: _selectedDate,
             detail: _detailController.text,
+            cost: cost,
           ),
         );
         maintenanceId = widget.maintenance!.id!;
@@ -408,6 +432,7 @@ class _MaintenanceFormSheetState extends ConsumerState<_MaintenanceFormSheet> {
           vehicleId: widget.vehicleId,
           date: _selectedDate!,
           detail: _detailController.text,
+          cost: cost,
         ));
       }
 

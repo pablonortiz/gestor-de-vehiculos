@@ -5,6 +5,7 @@ class Maintenance {
   final String vehicleId;
   final DateTime date;
   final String detail;
+  final double? cost;
   final List<MaintenanceInvoice> invoices;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -14,6 +15,7 @@ class Maintenance {
     required this.vehicleId,
     required this.date,
     required this.detail,
+    this.cost,
     this.invoices = const [],
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -25,6 +27,7 @@ class Maintenance {
     String? vehicleId,
     DateTime? date,
     String? detail,
+    double? cost,
     List<MaintenanceInvoice>? invoices,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -34,6 +37,7 @@ class Maintenance {
       vehicleId: vehicleId ?? this.vehicleId,
       date: date ?? this.date,
       detail: detail ?? this.detail,
+      cost: cost ?? this.cost,
       invoices: invoices ?? this.invoices,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -46,6 +50,7 @@ class Maintenance {
       'vehicle_id': vehicleId,
       'date': date.toIso8601String(),
       'detail': detail,
+      'cost': cost,
     };
   }
 
@@ -55,6 +60,7 @@ class Maintenance {
       vehicleId: map['vehicle_id'] as String,
       date: DateTime.parse(map['date'] as String),
       detail: map['detail'] as String,
+      cost: (map['cost'] as num?)?.toDouble(),
       invoices: invoices ?? [],
       createdAt: DateTime.parse(map['created_at'] as String),
       updatedAt: DateTime.parse(map['updated_at'] as String),
@@ -67,6 +73,7 @@ class Maintenance {
       'vehicle_id': vehicleId,
       'date': date.millisecondsSinceEpoch,
       'detail': detail,
+      'cost': cost,
       'created_at': createdAt.millisecondsSinceEpoch,
       'updated_at': updatedAt.millisecondsSinceEpoch,
     };
@@ -78,6 +85,7 @@ class Maintenance {
       vehicleId: map['vehicle_id'] as String,
       date: DateTime.fromMillisecondsSinceEpoch(map['date'] as int),
       detail: map['detail'] as String,
+      cost: (map['cost'] as num?)?.toDouble(),
       createdAt: DateTime.fromMillisecondsSinceEpoch(map['created_at'] as int),
       updatedAt: DateTime.fromMillisecondsSinceEpoch(map['updated_at'] as int),
     );
