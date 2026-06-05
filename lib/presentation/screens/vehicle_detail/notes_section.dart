@@ -205,182 +205,114 @@ class _NoteFormSheetState extends ConsumerState<_NoteFormSheet> {
                 ],
               ),
               // Fotos existentes (solo en edición)
-              if (_existingPhotos.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                const Text('Archivos guardados:', style: TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
-                const SizedBox(height: 4),
-                SizedBox(
-                  height: 80,
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: _existingPhotos.length,
-                    itemBuilder: (ctx, index) {
-                      final photo = _existingPhotos[index];
-                      return Stack(
-                        children: [
-                          GestureDetector(
-                            onTap: () {
-                              if (photo.isPdf) {
-                                _showPdfPreview(context, photo.cloudinaryUrl, photo.fileName);
-                              } else {
-                                _showFullScreenImage(context, photo.cloudinaryUrl);
-                              }
-                            },
-                            child: Container(
-                              margin: const EdgeInsets.only(right: 8),
-                              width: 80,
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
-                                child: photo.isPdf
-                                    ? _buildPdfThumbnailSmall(photo.fileName)
-                                    : CachedNetworkImage(
-                                        imageUrl: photo.cloudinaryUrl,
-                                        fit: BoxFit.cover,
-                                        placeholder: (_, __) => const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                                      ),
-                              ),
-                            ),
-                          ),
-                          if (!_isSaving)
-                            Positioned(
-                              top: 2,
-                              right: 10,
-                              child: GestureDetector(
-                                onTap: () async {
-                                  final noteRepo = ref.read(noteRepositoryProvider);
-                                  await noteRepo.deletePhoto(photo.id!);
-                                  if (!mounted) return;
-                                  setState(() {
-                                    _existingPhotos.remove(photo);
-                                  });
-                                  ref.invalidate(notesByVehicleProvider(widget.vehicleId));
-                                },
-                                child: Container(
-                                  padding: const EdgeInsets.all(2),
-                                  decoration: const BoxDecoration(
-                                    color: AppTheme.error,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(Icons.close, size: 14, color: Colors.white),
+              if (_existingPhotos.isNotEmpty)
+                _AttachmentStrip(
+                  title: 'Archivos guardados:',
+                  titleColor: AppTheme.textSecondary,
+                  itemCount: _existingPhotos.length,
+                  onRemove: _isSaving
+                      ? null
+                      : (index) async {
+                          final photo = _existingPhotos[index];
+                          final noteRepo = ref.read(noteRepositoryProvider);
+                          await noteRepo.deletePhoto(photo.id!);
+                          if (!mounted) return;
+                          setState(() {
+                            _existingPhotos.remove(photo);
+                          });
+                          ref.invalidate(notesByVehicleProvider(widget.vehicleId));
+                        },
+                  thumbnailBuilder: (index) {
+                    final photo = _existingPhotos[index];
+                    return GestureDetector(
+                      onTap: () {
+                        if (photo.isPdf) {
+                          _showPdfPreview(context, photo.cloudinaryUrl, photo.fileName);
+                        } else {
+                          _showFullScreenImage(context, photo.cloudinaryUrl);
+                        }
+                      },
+                      child: Container(
+                        margin: const EdgeInsets.only(right: 8),
+                        width: 80,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: photo.isPdf
+                              ? _buildPdfThumbnailSmall(photo.fileName)
+                              : CachedNetworkImage(
+                                  imageUrl: photo.cloudinaryUrl,
+                                  fit: BoxFit.cover,
+                                  placeholder: (_, __) => const Center(child: CircularProgressIndicator(strokeWidth: 2)),
                                 ),
-                              ),
-                            ),
-                        ],
-                      );
-                    },
-                  ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
-              ],
               // Fotos pendientes de subir
-              if (_pendingPhotos.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                const Text('Pendientes de subir:', style: TextStyle(fontSize: 12, color: AppTheme.warning)),
-                const SizedBox(height: 4),
-                SizedBox(
-                  height: 80,
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: _pendingPhotos.length,
-                    itemBuilder: (ctx, index) {
-                      final photo = _pendingPhotos[index];
-                      return Stack(
-                        children: [
-                          Container(
-                            margin: const EdgeInsets.only(right: 8),
-                            width: 80,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: AppTheme.warning),
-                            ),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: Image.file(
-                                File(photo.path),
-                                fit: BoxFit.cover,
-                              ),
-                            ),
-                          ),
-                          if (!_isSaving)
-                            Positioned(
-                              top: 2,
-                              right: 10,
-                              child: GestureDetector(
-                                onTap: () {
-                                  setState(() {
-                                    _pendingPhotos.remove(photo);
-                                  });
-                                },
-                                child: Container(
-                                  padding: const EdgeInsets.all(2),
-                                  decoration: const BoxDecoration(
-                                    color: AppTheme.error,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(Icons.close, size: 14, color: Colors.white),
-                                ),
-                              ),
-                            ),
-                        ],
-                      );
-                    },
-                  ),
+              if (_pendingPhotos.isNotEmpty)
+                _AttachmentStrip(
+                  title: 'Pendientes de subir:',
+                  titleColor: AppTheme.warning,
+                  itemCount: _pendingPhotos.length,
+                  onRemove: _isSaving
+                      ? null
+                      : (index) {
+                          setState(() {
+                            _pendingPhotos.removeAt(index);
+                          });
+                        },
+                  thumbnailBuilder: (index) {
+                    final photo = _pendingPhotos[index];
+                    return Container(
+                      margin: const EdgeInsets.only(right: 8),
+                      width: 80,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppTheme.warning),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.file(
+                          File(photo.path),
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    );
+                  },
                 ),
-              ],
               // Archivos pendientes (PDFs/imágenes del file picker)
-              if (_pendingFiles.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                const Text('Archivos pendientes:', style: TextStyle(fontSize: 12, color: AppTheme.warning)),
-                const SizedBox(height: 4),
-                SizedBox(
-                  height: 80,
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: _pendingFiles.length,
-                    itemBuilder: (ctx, index) {
-                      final file = _pendingFiles[index];
-                      final isFilePdf = file.extension?.toLowerCase() == 'pdf';
-                      return Stack(
-                        children: [
-                          Container(
-                            margin: const EdgeInsets.only(right: 8),
-                            width: 80,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: AppTheme.warning),
-                            ),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: isFilePdf
-                                  ? _buildPdfThumbnailSmall(file.name)
-                                  : Image.file(File(file.path!), fit: BoxFit.cover),
-                            ),
-                          ),
-                          if (!_isSaving)
-                            Positioned(
-                              top: 2,
-                              right: 10,
-                              child: GestureDetector(
-                                onTap: () {
-                                  setState(() {
-                                    _pendingFiles.remove(file);
-                                  });
-                                },
-                                child: Container(
-                                  padding: const EdgeInsets.all(2),
-                                  decoration: const BoxDecoration(
-                                    color: AppTheme.error,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(Icons.close, size: 14, color: Colors.white),
-                                ),
-                              ),
-                            ),
-                        ],
-                      );
-                    },
-                  ),
+              if (_pendingFiles.isNotEmpty)
+                _AttachmentStrip(
+                  title: 'Archivos pendientes:',
+                  titleColor: AppTheme.warning,
+                  itemCount: _pendingFiles.length,
+                  onRemove: _isSaving
+                      ? null
+                      : (index) {
+                          setState(() {
+                            _pendingFiles.removeAt(index);
+                          });
+                        },
+                  thumbnailBuilder: (index) {
+                    final file = _pendingFiles[index];
+                    final isFilePdf = file.extension?.toLowerCase() == 'pdf';
+                    return Container(
+                      margin: const EdgeInsets.only(right: 8),
+                      width: 80,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppTheme.warning),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: isFilePdf
+                            ? _buildPdfThumbnailSmall(file.name)
+                            : Image.file(File(file.path!), fit: BoxFit.cover),
+                      ),
+                    );
+                  },
                 ),
-              ],
               const SizedBox(height: 24),
               SizedBox(
                 width: double.infinity,
@@ -659,6 +591,68 @@ class _NoteCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+// Tira horizontal de thumbnails de adjuntos con botón de borrado opcional.
+// Comparte el esqueleto de las tres listas del formulario de nota (guardados /
+// pendientes / archivos); el contenido del thumbnail y la acción de borrado se
+// pasan por callback. onRemove == null oculta el botón (caso _isSaving).
+class _AttachmentStrip extends StatelessWidget {
+  final String title;
+  final Color titleColor;
+  final int itemCount;
+  final Widget Function(int index) thumbnailBuilder;
+  final void Function(int index)? onRemove;
+
+  const _AttachmentStrip({
+    required this.title,
+    required this.titleColor,
+    required this.itemCount,
+    required this.thumbnailBuilder,
+    this.onRemove,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 8),
+        Text(title, style: TextStyle(fontSize: 12, color: titleColor)),
+        const SizedBox(height: 4),
+        SizedBox(
+          height: 80,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: itemCount,
+            itemBuilder: (ctx, index) {
+              return Stack(
+                children: [
+                  thumbnailBuilder(index),
+                  if (onRemove != null)
+                    Positioned(
+                      top: 2,
+                      right: 10,
+                      child: GestureDetector(
+                        onTap: () => onRemove!(index),
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: const BoxDecoration(
+                            color: AppTheme.error,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.close, size: 14, color: Colors.white),
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 }
