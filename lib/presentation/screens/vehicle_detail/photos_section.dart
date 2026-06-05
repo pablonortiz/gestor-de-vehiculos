@@ -198,48 +198,21 @@ class _PhotosSectionState extends ConsumerState<_PhotosSection> {
       final cloudinary = CloudinaryService.instance;
       final photoRepo = ref.read(photoRepositoryProvider);
 
-      if (source == 'camera') {
-        final result = await cloudinary.uploadFromCamera();
-        if (result != null) {
-          await photoRepo.insertPhoto(VehiclePhoto(
-            vehicleId: widget.vehicleId,
-            cloudinaryUrl: result.url,
-            cloudinaryPublicId: result.publicId,
-          ));
-          if (mounted) setState(() => _uploadProgress = 1);
-        }
-      } else if (source == 'gallery') {
-        final results = await cloudinary.uploadMultipleFromGallery();
-        if (!mounted) return;
-        setState(() => _uploadTotal = results.length);
+      final results = await cloudinary.pickAndUpload(source);
+      if (!mounted) return;
+      setState(() => _uploadTotal = results.length);
 
-        for (int i = 0; i < results.length; i++) {
-          final result = results[i];
-          await photoRepo.insertPhoto(VehiclePhoto(
-            vehicleId: widget.vehicleId,
-            cloudinaryUrl: result.url,
-            cloudinaryPublicId: result.publicId,
-          ));
-          if (!mounted) return;
-          setState(() => _uploadProgress = i + 1);
-        }
-      } else if (source == 'file') {
-        final results = await cloudinary.uploadMultipleInvoices();
+      for (int i = 0; i < results.length; i++) {
+        final result = results[i];
+        await photoRepo.insertPhoto(VehiclePhoto(
+          vehicleId: widget.vehicleId,
+          cloudinaryUrl: result.url,
+          cloudinaryPublicId: result.publicId,
+          isPdf: result.isPdf,
+          fileName: result.fileName,
+        ));
         if (!mounted) return;
-        setState(() => _uploadTotal = results.length);
-
-        for (int i = 0; i < results.length; i++) {
-          final result = results[i];
-          await photoRepo.insertPhoto(VehiclePhoto(
-            vehicleId: widget.vehicleId,
-            cloudinaryUrl: result.url,
-            cloudinaryPublicId: result.publicId,
-            isPdf: result.isPdf,
-            fileName: result.fileName,
-          ));
-          if (!mounted) return;
-          setState(() => _uploadProgress = i + 1);
-        }
+        setState(() => _uploadProgress = i + 1);
       }
 
       ref.invalidate(photosByVehicleProvider(widget.vehicleId));

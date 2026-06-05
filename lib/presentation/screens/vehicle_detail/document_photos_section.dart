@@ -198,38 +198,16 @@ class _DocumentPhotosSectionState extends ConsumerState<_DocumentPhotosSection> 
       final cloudinary = CloudinaryService.instance;
       final docPhotoRepo = ref.read(documentPhotoRepositoryProvider);
 
-      if (source == 'camera') {
-        final result = await cloudinary.uploadFromCamera();
-        if (result != null) {
-          await docPhotoRepo.insertPhoto(DocumentPhoto(
-            vehicleId: widget.vehicleId,
-            documentType: type,
-            cloudinaryUrl: result.url,
-            cloudinaryPublicId: result.publicId,
-          ));
-        }
-      } else if (source == 'gallery') {
-        final results = await cloudinary.uploadMultipleFromGallery();
-        for (final result in results) {
-          await docPhotoRepo.insertPhoto(DocumentPhoto(
-            vehicleId: widget.vehicleId,
-            documentType: type,
-            cloudinaryUrl: result.url,
-            cloudinaryPublicId: result.publicId,
-          ));
-        }
-      } else if (source == 'file') {
-        final results = await cloudinary.uploadMultipleInvoices();
-        for (final result in results) {
-          await docPhotoRepo.insertPhoto(DocumentPhoto(
-            vehicleId: widget.vehicleId,
-            documentType: type,
-            cloudinaryUrl: result.url,
-            cloudinaryPublicId: result.publicId,
-            isPdf: result.isPdf,
-            fileName: result.fileName,
-          ));
-        }
+      final results = await cloudinary.pickAndUpload(source);
+      for (final result in results) {
+        await docPhotoRepo.insertPhoto(DocumentPhoto(
+          vehicleId: widget.vehicleId,
+          documentType: type,
+          cloudinaryUrl: result.url,
+          cloudinaryPublicId: result.publicId,
+          isPdf: result.isPdf,
+          fileName: result.fileName,
+        ));
       }
 
       ref.invalidate(documentPhotosByVehicleProvider(widget.vehicleId));

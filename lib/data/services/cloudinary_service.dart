@@ -142,6 +142,23 @@ class CloudinaryService {
   }
 
   // Subir archivo a Cloudinary
+  // Centraliza el branching de origen (cámara / galería / archivo) y devuelve
+  // los resultados de subida. Los callers solo persisten cada resultado en su
+  // repo, evitando reimplementar este flujo en cada sección.
+  Future<List<CloudinaryUploadResult>> pickAndUpload(String source) async {
+    switch (source) {
+      case 'camera':
+        final result = await uploadFromCamera();
+        return result != null ? [result] : [];
+      case 'gallery':
+        return uploadMultipleFromGallery();
+      case 'file':
+        return uploadMultipleInvoices();
+      default:
+        return [];
+    }
+  }
+
   // Subir archivo a Cloudinary. Devuelve null en error salvo que throwOnError
   // sea true (subidas single, donde el caller necesita distinguir fallo de
   // cancelación). Los loops/subidas múltiples usan null para saltear y seguir.
