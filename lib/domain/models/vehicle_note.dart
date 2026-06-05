@@ -30,7 +30,7 @@ class VehicleNote {
       detail: detail ?? this.detail,
       photos: photos ?? this.photos,
       createdAt: createdAt ?? this.createdAt,
-      updatedAt: updatedAt ?? DateTime.now(),
+      updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 

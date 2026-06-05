@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/vehicle_constants.dart';
+import '../../core/utils/enum_parser.dart';
 
 class Vehicle {
   final String? id;
@@ -97,7 +98,7 @@ class Vehicle {
       responsibleName: responsibleName ?? this.responsibleName,
       responsiblePhone: responsiblePhone ?? this.responsiblePhone,
       createdAt: createdAt ?? this.createdAt,
-      updatedAt: updatedAt ?? DateTime.now(),
+      updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 
@@ -133,7 +134,7 @@ class Vehicle {
     return Vehicle(
       id: map['id'] as String?,
       plate: map['plate'] as String,
-      type: VehicleType.values[map['type'] as int],
+      type: enumFromIndex(VehicleType.values, map['type'], VehicleType.car),
       brand: map['brand'] as String,
       model: map['model'] as String,
       year: map['year'] as int,
@@ -146,8 +147,9 @@ class Vehicle {
       insuranceExpiry: map['insurance_expiry'] != null
           ? DateTime.fromMillisecondsSinceEpoch(map['insurance_expiry'] as int)
           : null,
-      fuelType: FuelType.values[map['fuel_type'] as int],
-      status: VehicleStatus.values[map['status'] as int],
+      fuelType: enumFromIndex(FuelType.values, map['fuel_type'], FuelType.nafta),
+      status:
+          enumFromIndex(VehicleStatus.values, map['status'], VehicleStatus.available),
       provinceId: map['province_id'] as int,
       city: map['city'] as String,
       cityId: map['city_id'] as String?,
@@ -190,7 +192,7 @@ class Vehicle {
     return Vehicle(
       id: map['id'] as String,
       plate: map['plate'] as String,
-      type: VehicleType.values[map['type'] as int],
+      type: enumFromIndex(VehicleType.values, map['type'], VehicleType.car),
       brand: map['brand'] as String,
       model: map['model'] as String,
       year: map['year'] as int,
@@ -203,8 +205,9 @@ class Vehicle {
       insuranceExpiry: map['insurance_expiry'] != null
           ? DateTime.parse(map['insurance_expiry'] as String)
           : null,
-      fuelType: FuelType.values[map['fuel_type'] as int],
-      status: VehicleStatus.values[map['status'] as int],
+      fuelType: enumFromIndex(FuelType.values, map['fuel_type'], FuelType.nafta),
+      status:
+          enumFromIndex(VehicleStatus.values, map['status'], VehicleStatus.available),
       provinceId: map['province_id'] as int,
       city: map['city'] as String,
       cityId: map['city_id'] as String?,
@@ -249,7 +252,7 @@ class Vehicle {
     return Vehicle(
       id: json['id'] as String?,
       plate: json['plate'] as String,
-      type: VehicleType.values.firstWhere((e) => e.name == json['type']),
+      type: enumFromName(VehicleType.values, json['type'], VehicleType.car),
       brand: json['brand'] as String,
       model: json['model'] as String,
       year: json['year'] as int,
@@ -262,8 +265,9 @@ class Vehicle {
       insuranceExpiry: json['insuranceExpiry'] != null
           ? DateTime.parse(json['insuranceExpiry'] as String)
           : null,
-      fuelType: FuelType.values.firstWhere((e) => e.name == json['fuelType']),
-      status: VehicleStatus.values.firstWhere((e) => e.name == json['status']),
+      fuelType: enumFromName(FuelType.values, json['fuelType'], FuelType.nafta),
+      status:
+          enumFromName(VehicleStatus.values, json['status'], VehicleStatus.available),
       provinceId: json['provinceId'] as int,
       city: json['city'] as String,
       cityId: json['cityId'] as String?,
@@ -301,4 +305,58 @@ class Vehicle {
   }
 
   String get displayName => '$brand $model';
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is Vehicle &&
+        other.id == id &&
+        other.plate == plate &&
+        other.type == type &&
+        other.brand == brand &&
+        other.model == model &&
+        other.year == year &&
+        other.color == color &&
+        other.km == km &&
+        other.vtvExpiry == vtvExpiry &&
+        other.insuranceCompany == insuranceCompany &&
+        other.insuranceExpiry == insuranceExpiry &&
+        other.fuelType == fuelType &&
+        other.status == status &&
+        other.provinceId == provinceId &&
+        other.city == city &&
+        other.cityId == cityId &&
+        other.lugarId == lugarId &&
+        other.lugar == lugar &&
+        other.responsibleName == responsibleName &&
+        other.responsiblePhone == responsiblePhone &&
+        other.createdAt == createdAt &&
+        other.updatedAt == updatedAt;
+  }
+
+  @override
+  int get hashCode => Object.hashAll([
+        id,
+        plate,
+        type,
+        brand,
+        model,
+        year,
+        color,
+        km,
+        vtvExpiry,
+        insuranceCompany,
+        insuranceExpiry,
+        fuelType,
+        status,
+        provinceId,
+        city,
+        cityId,
+        lugarId,
+        lugar,
+        responsibleName,
+        responsiblePhone,
+        createdAt,
+        updatedAt,
+      ]);
 }

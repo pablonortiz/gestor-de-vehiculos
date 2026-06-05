@@ -1,3 +1,5 @@
+import '../../core/utils/enum_parser.dart';
+
 class Maintenance {
   final String? id;
   final String vehicleId;
@@ -34,7 +36,7 @@ class Maintenance {
       detail: detail ?? this.detail,
       invoices: invoices ?? this.invoices,
       createdAt: createdAt ?? this.createdAt,
-      updatedAt: updatedAt ?? DateTime.now(),
+      updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 
@@ -137,7 +139,8 @@ class MaintenanceInvoice {
       maintenanceId: map['maintenance_id'] as String,
       cloudinaryUrl: map['cloudinary_url'] as String,
       cloudinaryPublicId: map['cloudinary_public_id'] as String,
-      fileType: InvoiceFileType.values[map['file_type'] as int? ?? 0],
+      fileType: enumFromIndex(
+          InvoiceFileType.values, map['file_type'], InvoiceFileType.values.first),
       fileName: map['file_name'] as String?,
       createdAt: DateTime.parse(map['created_at'] as String),
     );
@@ -161,7 +164,8 @@ class MaintenanceInvoice {
       maintenanceId: map['maintenance_id'] as String,
       cloudinaryUrl: map['cloudinary_url'] as String,
       cloudinaryPublicId: map['cloudinary_public_id'] as String,
-      fileType: InvoiceFileType.values[map['file_type'] as int? ?? 0],
+      fileType: enumFromIndex(
+          InvoiceFileType.values, map['file_type'], InvoiceFileType.values.first),
       fileName: map['file_name'] as String?,
       createdAt: DateTime.fromMillisecondsSinceEpoch(map['created_at'] as int),
     );
