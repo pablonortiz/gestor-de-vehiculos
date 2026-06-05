@@ -46,7 +46,7 @@ void showCitiesInProvinceSheet(
 
                 return citiesAsync.when(
                   loading: () => const Center(child: CircularProgressIndicator()),
-                  error: (_, __) => const Center(child: Text('Error cargando ciudades')),
+                  error: (_, _) => const Center(child: Text('Error cargando ciudades')),
                   data: (cities) {
                     if (cities.isEmpty) {
                       return const Padding(
@@ -60,7 +60,7 @@ void showCitiesInProvinceSheet(
 
                     return countsAsync.when(
                       loading: () => _buildCityList(sheetContext, ref, province, cities, {}),
-                      error: (_, __) => _buildCityList(sheetContext, ref, province, cities, {}),
+                      error: (_, _) => _buildCityList(sheetContext, ref, province, cities, {}),
                       data: (counts) => _buildCityList(sheetContext, ref, province, cities, counts),
                     );
                   },

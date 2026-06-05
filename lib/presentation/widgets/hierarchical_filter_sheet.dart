@@ -94,7 +94,7 @@ class _HierarchicalFilterSheetState extends ConsumerState<HierarchicalFilterShee
                     ),
                     vehicleCountsAsync.when(
                       loading: () => const Center(child: CircularProgressIndicator()),
-                      error: (_, __) => const Text('Error cargando provincias'),
+                      error: (_, _) => const Text('Error cargando provincias'),
                       data: (counts) => _ProvinceList(
                         selectedProvinceId: locationFilter.provinceId,
                         vehicleCounts: counts,
@@ -217,7 +217,7 @@ class _ActiveFilterChips extends ConsumerWidget {
               final cityAsync = ref.watch(cityByIdProvider(locationFilter.cityId!));
               return cityAsync.when(
                 loading: () => const Chip(label: Text('...')),
-                error: (_, __) => const SizedBox.shrink(),
+                error: (_, _) => const SizedBox.shrink(),
                 data: (city) => city != null
                     ? Chip(
                         label: Text(city.name),
@@ -234,7 +234,7 @@ class _ActiveFilterChips extends ConsumerWidget {
               final lugarAsync = ref.watch(lugarByIdProvider(locationFilter.lugarId!));
               return lugarAsync.when(
                 loading: () => const Chip(label: Text('...')),
-                error: (_, __) => const SizedBox.shrink(),
+                error: (_, _) => const SizedBox.shrink(),
                 data: (lugar) => lugar != null
                     ? Chip(
                         label: Text(lugar.name),
@@ -327,7 +327,7 @@ class _CityList extends ConsumerWidget {
 
     return citiesAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (_, __) => const Text('Error cargando ciudades'),
+      error: (_, _) => const Text('Error cargando ciudades'),
       data: (cities) {
         if (cities.isEmpty) {
           return const Padding(
@@ -338,7 +338,7 @@ class _CityList extends ConsumerWidget {
 
         return countsAsync.when(
           loading: () => _buildCityList(context, cities, {}, selectedCityId, onSelected),
-          error: (_, __) => _buildCityList(context, cities, {}, selectedCityId, onSelected),
+          error: (_, _) => _buildCityList(context, cities, {}, selectedCityId, onSelected),
           data: (counts) => _buildCityList(context, cities, counts, selectedCityId, onSelected),
         );
       },
@@ -406,7 +406,7 @@ class _LugarList extends ConsumerWidget {
 
     return lugaresAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (_, __) => const Text('Error cargando lugares'),
+      error: (_, _) => const Text('Error cargando lugares'),
       data: (lugares) {
         if (lugares.isEmpty) {
           return const Padding(
@@ -417,7 +417,7 @@ class _LugarList extends ConsumerWidget {
 
         return countsAsync.when(
           loading: () => _buildLugarList(context, lugares, {}, selectedLugarId, onSelected),
-          error: (_, __) => _buildLugarList(context, lugares, {}, selectedLugarId, onSelected),
+          error: (_, _) => _buildLugarList(context, lugares, {}, selectedLugarId, onSelected),
           data: (counts) => _buildLugarList(context, lugares, counts, selectedLugarId, onSelected),
         );
       },

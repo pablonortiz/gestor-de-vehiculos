@@ -133,10 +133,10 @@ class _DocumentPhotosSectionState extends ConsumerState<_DocumentPhotosSection> 
                             : CachedNetworkImage(
                                 imageUrl: photo.cloudinaryUrl,
                                 fit: BoxFit.cover,
-                                placeholder: (_, __) => const Center(
+                                placeholder: (_, _) => const Center(
                                   child: CircularProgressIndicator(strokeWidth: 2),
                                 ),
-                                errorWidget: (_, __, ___) => const Icon(Icons.error),
+                                errorWidget: (_, _, _) => const Icon(Icons.error),
                               ),
                       ),
                     ),

@@ -125,10 +125,10 @@ class _PhotosSectionState extends ConsumerState<_PhotosSection> {
                             CachedNetworkImage(
                               imageUrl: photo.cloudinaryUrl,
                               fit: BoxFit.cover,
-                              placeholder: (_, __) => const Center(
+                              placeholder: (_, _) => const Center(
                                 child: CircularProgressIndicator(),
                               ),
-                              errorWidget: (_, __, ___) => const Icon(Icons.error),
+                              errorWidget: (_, _, _) => const Icon(Icons.error),
                             ),
                           if (photo.isPrimary)
                             Positioned(

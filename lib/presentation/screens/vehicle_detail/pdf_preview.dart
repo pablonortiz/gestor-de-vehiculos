@@ -61,10 +61,10 @@ void _showFullScreenImage(BuildContext context, String imageUrl) {
             child: CachedNetworkImage(
               imageUrl: imageUrl,
               fit: BoxFit.contain,
-              placeholder: (_, __) => const Center(
+              placeholder: (_, _) => const Center(
                 child: CircularProgressIndicator(),
               ),
-              errorWidget: (_, __, ___) => const Center(
+              errorWidget: (_, _, _) => const Center(
                 child: Icon(Icons.error, color: AppTheme.error, size: 48),
               ),
             ),

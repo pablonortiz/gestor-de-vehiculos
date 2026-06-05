@@ -117,7 +117,7 @@ class _FuelChargesScreenState extends ConsumerState<FuelChargesScreen> {
                                 Icon(
                                   Icons.local_gas_station_outlined,
                                   size: 64,
-                                  color: AppTheme.textSecondary.withOpacity(0.5),
+                                  color: AppTheme.textSecondary.withValues(alpha: 0.5),
                                 ),
                                 const SizedBox(height: 16),
                                 const Text(

@@ -133,7 +133,7 @@ class HomeScreen extends ConsumerWidget {
                             value: totalCountAsync.when(
                               data: (count) => count.toString(),
                               loading: () => '...',
-                              error: (_, __) => '0',
+                              error: (_, _) => '0',
                             ),
                             icon: Icons.directions_car,
                             color: AppTheme.accentPrimary,
@@ -146,7 +146,7 @@ class HomeScreen extends ConsumerWidget {
                             value: expiringAsync.when(
                               data: (list) => list.length.toString(),
                               loading: () => '...',
-                              error: (_, __) => '0',
+                              error: (_, _) => '0',
                             ),
                             icon: Icons.warning_amber_rounded,
                             color: AppTheme.warning,

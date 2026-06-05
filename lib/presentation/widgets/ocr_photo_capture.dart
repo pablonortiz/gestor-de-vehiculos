@@ -99,7 +99,7 @@ class _OcrPhotoCaptureState extends State<OcrPhotoCapture> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
-                color: AppTheme.accentPrimary.withOpacity(0.1),
+                color: AppTheme.accentPrimary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(4),
               ),
               child: const Text(
@@ -155,7 +155,7 @@ class _OcrPhotoCaptureState extends State<OcrPhotoCapture> {
                     fit: BoxFit.cover,
                     width: double.infinity,
                     height: double.infinity,
-                    placeholder: (_, __) => const Center(
+                    placeholder: (_, _) => const Center(
                       child: CircularProgressIndicator(strokeWidth: 2),
                     ),
                   ),
@@ -170,7 +170,7 @@ class _OcrPhotoCaptureState extends State<OcrPhotoCapture> {
             child: Container(
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.6),
+                color: Colors.black.withValues(alpha: 0.6),
                 shape: BoxShape.circle,
               ),
               child: const Icon(

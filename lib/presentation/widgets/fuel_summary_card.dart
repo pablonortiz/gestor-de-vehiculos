@@ -30,15 +30,15 @@ class FuelSummaryCard extends StatelessWidget {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            AppTheme.accentPrimary.withOpacity(compact ? 0.1 : 0.15),
-            AppTheme.accentDark.withOpacity(compact ? 0.05 : 0.1),
+            AppTheme.accentPrimary.withValues(alpha: compact ? 0.1 : 0.15),
+            AppTheme.accentDark.withValues(alpha: compact ? 0.05 : 0.1),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(compact ? 12 : 16),
         border: Border.all(
-          color: AppTheme.accentPrimary.withOpacity(compact ? 0.2 : 0.3),
+          color: AppTheme.accentPrimary.withValues(alpha: compact ? 0.2 : 0.3),
         ),
       ),
       child: summary.chargeCount == 0

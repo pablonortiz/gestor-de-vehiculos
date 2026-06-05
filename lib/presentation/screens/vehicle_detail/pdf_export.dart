@@ -26,7 +26,7 @@ void _showPdfOptions(
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: AppTheme.textSecondary.withOpacity(0.3),
+                color: AppTheme.textSecondary.withValues(alpha: 0.3),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -44,7 +44,7 @@ void _showPdfOptions(
               leading: Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: AppTheme.accentPrimary.withOpacity(0.1),
+                  color: AppTheme.accentPrimary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(Icons.directions_car, color: AppTheme.accentPrimary),
@@ -74,7 +74,7 @@ void _showPdfOptions(
               leading: Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: AppTheme.accentPrimary.withOpacity(0.1),
+                  color: AppTheme.accentPrimary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(Icons.local_gas_station, color: AppTheme.accentPrimary),
@@ -104,7 +104,7 @@ void _showPdfOptions(
               leading: Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: AppTheme.accentPrimary.withOpacity(0.1),
+                  color: AppTheme.accentPrimary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(Icons.summarize, color: AppTheme.accentPrimary),
@@ -242,7 +242,7 @@ class _ReportConfigSheetState extends State<_ReportConfigSheet> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: AppTheme.textSecondary.withOpacity(0.3),
+                color: AppTheme.textSecondary.withValues(alpha: 0.3),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -295,7 +295,7 @@ class _ReportConfigSheetState extends State<_ReportConfigSheet> {
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       decoration: BoxDecoration(
                         color: !_isCustomRange
-                            ? AppTheme.accentPrimary.withOpacity(0.2)
+                            ? AppTheme.accentPrimary.withValues(alpha: 0.2)
                             : AppTheme.surfaceLight,
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
@@ -349,7 +349,7 @@ class _ReportConfigSheetState extends State<_ReportConfigSheet> {
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       decoration: BoxDecoration(
                         color: _isCustomRange
-                            ? AppTheme.accentPrimary.withOpacity(0.2)
+                            ? AppTheme.accentPrimary.withValues(alpha: 0.2)
                             : AppTheme.surfaceLight,
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
@@ -396,7 +396,7 @@ class _ReportConfigSheetState extends State<_ReportConfigSheet> {
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       decoration: BoxDecoration(
                         color: _ascending
-                            ? AppTheme.accentPrimary.withOpacity(0.2)
+                            ? AppTheme.accentPrimary.withValues(alpha: 0.2)
                             : AppTheme.surfaceLight,
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
@@ -433,7 +433,7 @@ class _ReportConfigSheetState extends State<_ReportConfigSheet> {
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       decoration: BoxDecoration(
                         color: !_ascending
-                            ? AppTheme.accentPrimary.withOpacity(0.2)
+                            ? AppTheme.accentPrimary.withValues(alpha: 0.2)
                             : AppTheme.surfaceLight,
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(

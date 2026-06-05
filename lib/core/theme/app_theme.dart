@@ -145,7 +145,7 @@ class AppTheme {
       ),
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: surface,
-        indicatorColor: accentPrimary.withOpacity(0.2),
+        indicatorColor: accentPrimary.withValues(alpha: 0.2),
         iconTheme: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
             return const IconThemeData(color: accentPrimary);
@@ -184,7 +184,7 @@ class AppTheme {
       ),
       chipTheme: ChipThemeData(
         backgroundColor: surfaceLight,
-        selectedColor: accentPrimary.withOpacity(0.3),
+        selectedColor: accentPrimary.withValues(alpha: 0.3),
         labelStyle: const TextStyle(color: textPrimary),
         side: const BorderSide(color: border),
         shape: RoundedRectangleBorder(
@@ -204,7 +204,7 @@ class AppTheme {
         }),
         trackColor: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
-            return accentPrimary.withOpacity(0.4);
+            return accentPrimary.withValues(alpha: 0.4);
           }
           return border;
         }),
@@ -288,7 +288,7 @@ class AppTheme {
   // Sombras suaves con tinte celeste
   static List<BoxShadow> get cardShadow => [
     BoxShadow(
-      color: accentPrimary.withOpacity(0.1),
+      color: accentPrimary.withValues(alpha: 0.1),
       blurRadius: 20,
       offset: const Offset(0, 8),
     ),

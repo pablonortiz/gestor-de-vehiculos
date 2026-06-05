@@ -57,7 +57,7 @@ class _FuelChargesSectionState extends ConsumerState<_FuelChargesSection> {
         summaryAsync.when(
           data: (summary) => FuelSummaryCard(summary: summary, compact: true),
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (_, __) => const SizedBox.shrink(),
+          error: (_, _) => const SizedBox.shrink(),
         ),
 
         if (widget.recentCharges.isNotEmpty) ...[
@@ -84,7 +84,7 @@ class _FuelChargesSectionState extends ConsumerState<_FuelChargesSection> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: AppTheme.accentPrimary.withOpacity(0.1),
+                    color: AppTheme.accentPrimary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Icon(

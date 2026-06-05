@@ -252,7 +252,7 @@ class VehicleDetailScreen extends ConsumerWidget {
                           vehicleId: vehicleId,
                         ),
                         loading: () => const SizedBox.shrink(),
-                        error: (_, __) => const SizedBox.shrink(),
+                        error: (_, _) => const SizedBox.shrink(),
                       ),
 
                       // Contacto del responsable
@@ -449,7 +449,7 @@ class VehicleDetailScreen extends ConsumerWidget {
                           vehicleId: vehicleId,
                         ),
                         loading: () => const SizedBox.shrink(),
-                        error: (_, __) => const SizedBox.shrink(),
+                        error: (_, _) => const SizedBox.shrink(),
                       ),
 
                       // Mantenimientos
@@ -470,7 +470,7 @@ class VehicleDetailScreen extends ConsumerWidget {
                           vehicleId: vehicleId,
                         ),
                         loading: () => const SizedBox.shrink(),
-                        error: (_, __) => const SizedBox.shrink(),
+                        error: (_, _) => const SizedBox.shrink(),
                       ),
                       const SizedBox(height: 24),
 

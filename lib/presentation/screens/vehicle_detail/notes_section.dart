@@ -281,7 +281,7 @@ class _NoteFormSheetState extends ConsumerState<_NoteFormSheet> {
                               : CachedNetworkImage(
                                   imageUrl: photo.cloudinaryUrl,
                                   fit: BoxFit.cover,
-                                  placeholder: (_, __) => const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                                  placeholder: (_, _) => const Center(child: CircularProgressIndicator(strokeWidth: 2)),
                                 ),
                         ),
                       ),

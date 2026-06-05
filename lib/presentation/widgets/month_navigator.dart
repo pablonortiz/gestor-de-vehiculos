@@ -54,7 +54,7 @@ class MonthNavigator extends StatelessWidget {
             icon: Icon(
               Icons.chevron_right,
               color: isCurrentMonth
-                  ? AppTheme.textSecondary.withOpacity(0.3)
+                  ? AppTheme.textSecondary.withValues(alpha: 0.3)
                   : AppTheme.accentPrimary,
             ),
             style: IconButton.styleFrom(

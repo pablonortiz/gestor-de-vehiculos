@@ -94,7 +94,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           color: AppTheme.accentPrimary,
                         ),
                       ),
-                      error: (_, __) => const Text(
+                      error: (_, _) => const Text(
                         '0',
                         style: TextStyle(
                           fontSize: 36,

@@ -49,10 +49,10 @@ class OcrFullScreenViewer extends StatelessWidget {
                   child: CachedNetworkImage(
                     imageUrl: imageUrl,
                     fit: BoxFit.contain,
-                    placeholder: (_, __) => const Center(
+                    placeholder: (_, _) => const Center(
                       child: CircularProgressIndicator(),
                     ),
-                    errorWidget: (_, __, ___) => const Icon(
+                    errorWidget: (_, _, _) => const Icon(
                       Icons.error,
                       color: Colors.white,
                       size: 48,
@@ -65,7 +65,7 @@ class OcrFullScreenViewer extends StatelessWidget {
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(16),
-              color: Colors.black.withOpacity(0.8),
+              color: Colors.black.withValues(alpha: 0.8),
               child: Text(
                 isReceipt
                     ? 'Pellizca para zoom. Busca el precio total en el ticket.'
