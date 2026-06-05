@@ -327,12 +327,18 @@ class _FuelChargeFormSheetState extends ConsumerState<FuelChargeFormSheet> {
     setState(() => _isSaving = true);
 
     try {
-      final liters = double.parse(_litersController.text.replaceAll(',', '.'));
+      final liters = double.tryParse(_litersController.text.replaceAll(',', '.'));
       final priceText = _priceController.text.replaceAll('.', '').replaceAll(',', '.');
-      final price = double.parse(priceText);
+      final price = double.tryParse(priceText);
       final odometer = _odometerController.text.isNotEmpty
-          ? int.parse(_odometerController.text.replaceAll('.', '').replaceAll(',', ''))
+          ? int.tryParse(_odometerController.text.replaceAll('.', '').replaceAll(',', ''))
           : null;
+      if (liters == null || price == null) {
+        // El validator debería prevenirlo; si igual llega un valor no numérico,
+        // abortamos limpio en vez de lanzar FormatException.
+        if (mounted) setState(() => _isSaving = false);
+        return;
+      }
       final notes = _notesController.text.isNotEmpty ? _notesController.text : null;
 
       final fuelCharge = FuelCharge(

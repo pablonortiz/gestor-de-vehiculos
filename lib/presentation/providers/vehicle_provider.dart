@@ -65,14 +65,14 @@ final totalVehicleCountProvider = FutureProvider<int>((ref) async {
 });
 
 // Vehículo por ID
-final vehicleByIdProvider = FutureProvider.family<Vehicle?, String>((ref, id) async {
+final vehicleByIdProvider = FutureProvider.autoDispose.family<Vehicle?, String>((ref, id) async {
   ref.watch(vehiclesChangeProvider);
   final repository = ref.watch(vehicleRepositoryProvider);
   return repository.getVehicleById(id);
 });
 
 // Búsqueda de vehículos
-final vehicleSearchProvider = FutureProvider.family<List<Vehicle>, String>((ref, query) async {
+final vehicleSearchProvider = FutureProvider.autoDispose.family<List<Vehicle>, String>((ref, query) async {
   ref.watch(vehiclesChangeProvider);
   final repository = ref.watch(vehicleRepositoryProvider);
   if (query.isEmpty) return [];
@@ -80,7 +80,7 @@ final vehicleSearchProvider = FutureProvider.family<List<Vehicle>, String>((ref,
 });
 
 // Historial de un vehículo
-final vehicleHistoryProvider = FutureProvider.family<List<VehicleHistory>, String>((ref, vehicleId) async {
+final vehicleHistoryProvider = FutureProvider.autoDispose.family<List<VehicleHistory>, String>((ref, vehicleId) async {
   ref.watch(vehiclesChangeProvider);
   final repository = ref.watch(vehicleRepositoryProvider);
   return repository.getVehicleHistory(vehicleId);
@@ -94,21 +94,21 @@ final expiringDocumentsProvider = FutureProvider<List<Vehicle>>((ref) async {
 });
 
 // Mantenimientos de un vehículo
-final maintenancesByVehicleProvider = FutureProvider.family<List<Maintenance>, String>((ref, vehicleId) async {
+final maintenancesByVehicleProvider = FutureProvider.autoDispose.family<List<Maintenance>, String>((ref, vehicleId) async {
   ref.watch(maintenancesChangeProvider);
   final repository = ref.watch(maintenanceRepositoryProvider);
   return repository.getMaintenancesByVehicle(vehicleId);
 });
 
 // Notas de un vehículo
-final notesByVehicleProvider = FutureProvider.family<List<VehicleNote>, String>((ref, vehicleId) async {
+final notesByVehicleProvider = FutureProvider.autoDispose.family<List<VehicleNote>, String>((ref, vehicleId) async {
   ref.watch(notesChangeProvider);
   final repository = ref.watch(noteRepositoryProvider);
   return repository.getNotesByVehicle(vehicleId);
 });
 
 // Fotos de un vehículo
-final photosByVehicleProvider = FutureProvider.family<List<VehiclePhoto>, String>((ref, vehicleId) async {
+final photosByVehicleProvider = FutureProvider.autoDispose.family<List<VehiclePhoto>, String>((ref, vehicleId) async {
   ref.watch(photosChangeProvider);
   final repository = ref.watch(photoRepositoryProvider);
   return repository.getPhotosByVehicle(vehicleId);

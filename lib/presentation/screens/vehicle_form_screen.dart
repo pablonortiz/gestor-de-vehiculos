@@ -657,7 +657,7 @@ class _VehicleFormScreenState extends ConsumerState<VehicleFormScreen> {
         type: _selectedType,
         brand: _brandController.text.trim(),
         model: _modelController.text.trim(),
-        year: int.parse(_yearController.text),
+        year: int.tryParse(_yearController.text) ?? DateTime.now().year,
         color: _selectedColor,
         km: int.tryParse(_kmController.text) ?? 0,
         vtvExpiry: _vtvExpiry,
