@@ -125,6 +125,7 @@ class _MaintenanceFormSheet extends ConsumerStatefulWidget {
 }
 
 class _MaintenanceFormSheetState extends ConsumerState<_MaintenanceFormSheet> {
+  final _formKey = GlobalKey<FormState>();
   late final TextEditingController _dateController;
   late final TextEditingController _detailController;
   late DateTime? _selectedDate;
@@ -186,7 +187,9 @@ class _MaintenanceFormSheetState extends ConsumerState<_MaintenanceFormSheet> {
       child: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
-          child: Column(
+          child: Form(
+            key: _formKey,
+            child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -211,6 +214,7 @@ class _MaintenanceFormSheetState extends ConsumerState<_MaintenanceFormSheet> {
                 controller: _dateController,
                 readOnly: true,
                 enabled: !_isSaving,
+                validator: (_) => _selectedDate == null ? 'Completá la fecha' : null,
                 decoration: const InputDecoration(
                   labelText: 'Fecha *',
                   prefixIcon: Icon(Icons.calendar_today),
@@ -239,6 +243,8 @@ class _MaintenanceFormSheetState extends ConsumerState<_MaintenanceFormSheet> {
                   labelText: 'Detalle *',
                   alignLabelWithHint: true,
                 ),
+                validator: (v) =>
+                    (v == null || v.trim().isEmpty) ? 'Completá el detalle' : null,
               ),
               const SizedBox(height: 16),
               Row(
@@ -374,18 +380,14 @@ class _MaintenanceFormSheetState extends ConsumerState<_MaintenanceFormSheet> {
               ),
             ],
           ),
+          ),
         ),
       ),
     );
   }
 
   Future<void> _save() async {
-    if (_selectedDate == null || _detailController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Completá la fecha y el detalle')),
-      );
-      return;
-    }
+    if (!(_formKey.currentState?.validate() ?? false)) return;
 
     setState(() => _isSaving = true);
 

@@ -125,6 +125,7 @@ class _NoteFormSheet extends ConsumerStatefulWidget {
 }
 
 class _NoteFormSheetState extends ConsumerState<_NoteFormSheet> {
+  final _formKey = GlobalKey<FormState>();
   late final TextEditingController _detailController;
   late List<NotePhoto> _existingPhotos;
   final List<XFile> _pendingPhotos = [];
@@ -198,13 +199,18 @@ class _NoteFormSheetState extends ConsumerState<_NoteFormSheet> {
                 ],
               ),
               const SizedBox(height: 20),
-              TextFormField(
-                controller: _detailController,
-                maxLines: 4,
-                enabled: !_isSaving,
-                decoration: const InputDecoration(
-                  labelText: 'Detalle *',
-                  alignLabelWithHint: true,
+              Form(
+                key: _formKey,
+                child: TextFormField(
+                  controller: _detailController,
+                  maxLines: 4,
+                  enabled: !_isSaving,
+                  decoration: const InputDecoration(
+                    labelText: 'Detalle *',
+                    alignLabelWithHint: true,
+                  ),
+                  validator: (v) =>
+                      (v == null || v.trim().isEmpty) ? 'Completá el detalle' : null,
                 ),
               ),
               const SizedBox(height: 16),
@@ -420,12 +426,7 @@ class _NoteFormSheetState extends ConsumerState<_NoteFormSheet> {
   }
 
   Future<void> _save() async {
-    if (_detailController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Completá el detalle')),
-      );
-      return;
-    }
+    if (!(_formKey.currentState?.validate() ?? false)) return;
 
     setState(() => _isSaving = true);
 
