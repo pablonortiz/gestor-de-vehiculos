@@ -23,8 +23,14 @@ void main() async {
     databaseFactory = databaseFactoryFfi;
   }
   
-  // Cargar variables de entorno
-  await dotenv.load(fileName: '.env');
+  // Cargar variables de entorno. Si falta el .env (p.ej. build sin el asset
+  // empaquetado), no abortamos el arranque: SupabaseConfig.isConfigured maneja
+  // la ausencia de credenciales y la app corre en modo local.
+  try {
+    await dotenv.load(fileName: '.env');
+  } catch (e) {
+    debugPrint('No se pudo cargar .env, se continúa sin config remota: $e');
+  }
   
   // Inicializar locale para fechas en español
   await initializeDateFormatting('es', null);

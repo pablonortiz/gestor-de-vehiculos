@@ -69,4 +69,14 @@ void main() {
       expect(v.copyWith(updatedAt: t).updatedAt, equals(t));
     });
   });
+
+  group('VehicleColors.getByColor (#B22)', () {
+    test('matchea un color predefinido vía toARGB32', () {
+      expect(VehicleColors.getByColor(const Color(0xFFDC2626)).name, 'Rojo');
+    });
+
+    test('un color desconocido cae al primero', () {
+      expect(VehicleColors.getByColor(const Color(0xFF123456)).name, 'Blanco');
+    });
+  });
 }

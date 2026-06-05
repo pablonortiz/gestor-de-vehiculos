@@ -142,7 +142,7 @@ class VehicleColors {
 
   static VehicleColorOption getByColor(Color color) {
     return options.firstWhere(
-      (o) => o.color.value == color.value,
+      (o) => o.color.toARGB32() == color.toARGB32(),
       orElse: () => options.first,
     );
   }

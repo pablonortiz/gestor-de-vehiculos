@@ -15,6 +15,7 @@ final GlobalKey<NavigatorState> _shellNavigatorKey = GlobalKey<NavigatorState>()
 final router = GoRouter(
   navigatorKey: _rootNavigatorKey,
   initialLocation: '/',
+  errorBuilder: (context, state) => _RouteErrorScreen(error: state.error),
   routes: [
     ShellRoute(
       navigatorKey: _shellNavigatorKey,
@@ -91,6 +92,37 @@ final router = GoRouter(
     ),
   ],
 );
+
+class _RouteErrorScreen extends StatelessWidget {
+  final Exception? error;
+
+  const _RouteErrorScreen({this.error});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.error_outline,
+                size: 64, color: Theme.of(context).colorScheme.error),
+            const SizedBox(height: 16),
+            const Text(
+              'Página no encontrada',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: () => context.go('/'),
+              child: const Text('Volver al inicio'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class MainShell extends StatelessWidget {
   final Widget child;
