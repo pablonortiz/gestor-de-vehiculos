@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -48,9 +49,17 @@ class SyncState {
 }
 
 class SyncService extends StateNotifier<SyncState> {
-  SyncService() : super(SyncState());
+  SyncService() : super(SyncState()) {
+    // Al recuperar conectividad, sincronizar: de lo contrario la cola de
+    // pendientes solo se drena al reabrir la app o con pull-to-refresh manual.
+    // fullSync tiene su propio guard de re-entrada y chequeo de online.
+    _connectivitySub = Connectivity().onConnectivityChanged.listen((result) {
+      if (result != ConnectivityResult.none) fullSync();
+    });
+  }
 
   final _db = DatabaseHelper.instance;
+  StreamSubscription<ConnectivityResult>? _connectivitySub;
 
   // Ventana corta para ignorar el "eco" de realtime de nuestras propias
   // escrituras: Supabase emite eventos PostgresChange también por los writes de
@@ -443,6 +452,12 @@ class SyncService extends StateNotifier<SyncState> {
     if (await isOnline && SupabaseConfig.isConfigured) {
       await _processSyncQueue();
     }
+  }
+
+  @override
+  void dispose() {
+    _connectivitySub?.cancel();
+    super.dispose();
   }
 }
 
