@@ -250,6 +250,12 @@ class _DocumentPhotosSectionState extends ConsumerState<_DocumentPhotosSection> 
               title: const Text('Eliminar', style: TextStyle(color: AppTheme.error)),
               onTap: () async {
                 Navigator.pop(ctx);
+                if (!await confirmDelete(context,
+                    title: 'Eliminar documento',
+                    message: '¿Eliminar esta foto del documento? No se puede deshacer.')) {
+                  return;
+                }
+                if (!mounted) return;
                 final docPhotoRepo = ref.read(documentPhotoRepositoryProvider);
                 try {
                   await docPhotoRepo.deletePhoto(photo.id!);

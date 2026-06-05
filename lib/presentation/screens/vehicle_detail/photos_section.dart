@@ -272,6 +272,12 @@ class _PhotosSectionState extends ConsumerState<_PhotosSection> {
               title: const Text('Eliminar', style: TextStyle(color: AppTheme.error)),
               onTap: _isProcessing ? null : () async {
                 Navigator.pop(ctx);
+                if (!await confirmDelete(context,
+                    title: 'Eliminar foto',
+                    message: '¿Eliminar esta foto? No se puede deshacer.')) {
+                  return;
+                }
+                if (!mounted) return;
                 setState(() => _isProcessing = true);
                 try {
                   final photoRepo = ref.read(photoRepositoryProvider);

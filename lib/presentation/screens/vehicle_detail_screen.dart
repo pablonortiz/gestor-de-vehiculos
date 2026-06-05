@@ -25,6 +25,7 @@ import '../providers/fuel_charge_provider.dart';
 import '../widgets/vehicle_icon.dart';
 import '../widgets/fuel_summary_card.dart';
 import '../../core/utils/contact_launcher.dart';
+import '../../core/utils/confirm_dialog.dart';
 
 part 'vehicle_detail/photos_section.dart';
 part 'vehicle_detail/document_photos_section.dart';

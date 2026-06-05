@@ -85,6 +85,12 @@ class _NotesSectionState extends ConsumerState<_NotesSection> {
   }
 
   Future<void> _deleteNote(VehicleNote note) async {
+    if (!await confirmDelete(context,
+        title: 'Eliminar nota',
+        message: '¿Eliminar esta nota y sus fotos? No se puede deshacer.')) {
+      return;
+    }
+    if (!mounted) return;
     setState(() => _isDeleting = true);
     try {
       final noteRepo = ref.read(noteRepositoryProvider);
@@ -214,6 +220,12 @@ class _NoteFormSheetState extends ConsumerState<_NoteFormSheet> {
                       ? null
                       : (index) async {
                           final photo = _existingPhotos[index];
+                          if (!await confirmDelete(context,
+                              title: 'Eliminar foto',
+                              message: '¿Eliminar esta foto de la nota? No se puede deshacer.')) {
+                            return;
+                          }
+                          if (!mounted) return;
                           final noteRepo = ref.read(noteRepositoryProvider);
                           await noteRepo.deletePhoto(photo.id!);
                           if (!mounted) return;

@@ -85,6 +85,12 @@ class _MaintenancesSectionState extends ConsumerState<_MaintenancesSection> {
   }
 
   Future<void> _deleteMaintenance(Maintenance maintenance) async {
+    if (!await confirmDelete(context,
+        title: 'Eliminar mantenimiento',
+        message: '¿Eliminar este mantenimiento y sus facturas? No se puede deshacer.')) {
+      return;
+    }
+    if (!mounted) return;
     setState(() => _isDeleting = true);
     try {
       final maintenanceRepo = ref.read(maintenanceRepositoryProvider);
@@ -280,6 +286,12 @@ class _MaintenanceFormSheetState extends ConsumerState<_MaintenanceFormSheet> {
                         style: const TextStyle(fontSize: 12),
                       ),
                       onDeleted: _isSaving ? null : () async {
+                        if (!await confirmDelete(context,
+                            title: 'Eliminar factura',
+                            message: '¿Eliminar esta factura? No se puede deshacer.')) {
+                          return;
+                        }
+                        if (!mounted) return;
                         final maintenanceRepo = ref.read(maintenanceRepositoryProvider);
                         await maintenanceRepo.deleteInvoice(invoice.id!);
                         if (!mounted) return;
