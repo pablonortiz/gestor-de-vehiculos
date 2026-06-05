@@ -14,6 +14,7 @@ import '../providers/location_provider.dart';
 import '../widgets/vehicle_icon.dart';
 import '../widgets/city_autocomplete.dart';
 import '../widgets/lugar_autocomplete.dart';
+import '../../core/utils/confirm_dialog.dart';
 
 class VehicleFormScreen extends ConsumerStatefulWidget {
   final String? vehicleId;
@@ -52,6 +53,9 @@ class _VehicleFormScreenState extends ConsumerState<VehicleFormScreen> {
 
   bool _isLoading = false;
   bool _isEditing = false;
+  bool _hasChanges = false;
+  // Mientras es true (carga inicial), los cambios programáticos no marcan dirty.
+  bool _settingUp = true;
 
   @override
   void initState() {
@@ -67,6 +71,9 @@ class _VehicleFormScreenState extends ConsumerState<VehicleFormScreen> {
     _responsibleNameController = TextEditingController();
     _responsiblePhoneController = TextEditingController();
 
+    for (final c in _editableControllers) {
+      c.addListener(_markDirty);
+    }
     _plateController.addListener(() {
       setState(() {});
     });
@@ -74,6 +81,42 @@ class _VehicleFormScreenState extends ConsumerState<VehicleFormScreen> {
     if (widget.vehicleId != null) {
       _isEditing = true;
       _loadVehicle();
+    } else {
+      _settingUp = false;
+    }
+  }
+
+  List<TextEditingController> get _editableControllers => [
+        _plateController,
+        _brandController,
+        _modelController,
+        _yearController,
+        _kmController,
+        _insuranceCompanyController,
+        _cityController,
+        _lugarController,
+        _responsibleNameController,
+        _responsiblePhoneController,
+      ];
+
+  void _markDirty() {
+    if (_settingUp) return;
+    if (!_hasChanges) setState(() => _hasChanges = true);
+  }
+
+  Future<bool> _confirmDiscard() async {
+    if (!_hasChanges) return true;
+    return confirmDelete(
+      context,
+      title: 'Descartar cambios',
+      message: 'Tenés cambios sin guardar. ¿Querés descartarlos?',
+      confirmLabel: 'Descartar',
+    );
+  }
+
+  Future<void> _attemptClose() async {
+    if (await _confirmDiscard() && mounted) {
+      context.pop();
     }
   }
 
@@ -103,6 +146,7 @@ class _VehicleFormScreenState extends ConsumerState<VehicleFormScreen> {
         _insuranceExpiry = vehicle.insuranceExpiry;
       });
     }
+    _settingUp = false;
   }
 
   @override
@@ -174,7 +218,13 @@ class _VehicleFormScreenState extends ConsumerState<VehicleFormScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _attemptClose();
+      },
+      child: Scaffold(
       body: SafeArea(
         child: Form(
           key: _formKey,
@@ -189,7 +239,7 @@ class _VehicleFormScreenState extends ConsumerState<VehicleFormScreen> {
                 plate: _plateController.text.isNotEmpty
                     ? _plateController.text.toUpperCase()
                     : null,
-                onClose: () => context.pop(),
+                onClose: _attemptClose,
               ),
 
               // Contenido scrolleable
@@ -211,6 +261,7 @@ class _VehicleFormScreenState extends ConsumerState<VehicleFormScreen> {
           ),
         ),
       ),
+      ),
     );
   }
 
@@ -221,14 +272,20 @@ class _VehicleFormScreenState extends ConsumerState<VehicleFormScreen> {
       VehicleTypeSelector(
         selectedType: _selectedType,
         vehicleColor: _selectedColor,
-        onSelected: (type) => setState(() => _selectedType = type),
+        onSelected: (type) {
+          setState(() => _selectedType = type);
+          _markDirty();
+        },
       ),
       const SizedBox(height: 24),
       _SectionLabel(label: 'Color'),
       const SizedBox(height: 12),
       VehicleColorSelector(
         selectedColor: _selectedColor,
-        onSelected: (color) => setState(() => _selectedColor = color),
+        onSelected: (color) {
+          setState(() => _selectedColor = color);
+          _markDirty();
+        },
       ),
       const SizedBox(height: 24),
     ];
@@ -394,7 +451,10 @@ class _VehicleFormScreenState extends ConsumerState<VehicleFormScreen> {
           );
         }).toList(),
         onChanged: (value) {
-          if (value != null) setState(() => _selectedFuelType = value);
+          if (value != null) {
+            setState(() => _selectedFuelType = value);
+            _markDirty();
+          }
         },
       ),
       const SizedBox(height: 20),
@@ -427,7 +487,10 @@ class _VehicleFormScreenState extends ConsumerState<VehicleFormScreen> {
           );
         }).toList(),
         onChanged: (value) {
-          if (value != null) setState(() => _selectedStatus = value);
+          if (value != null) {
+            setState(() => _selectedStatus = value);
+            _markDirty();
+          }
         },
       ),
       const SizedBox(height: 24),
@@ -462,6 +525,7 @@ class _VehicleFormScreenState extends ConsumerState<VehicleFormScreen> {
               _selectedCityId = null;
               _selectedLugarId = null;
             });
+            _markDirty();
           }
         },
       ),
@@ -594,7 +658,10 @@ class _VehicleFormScreenState extends ConsumerState<VehicleFormScreen> {
       _DatePickerField(
         label: 'Vencimiento VTV',
         value: _vtvExpiry,
-        onChanged: (date) => setState(() => _vtvExpiry = date),
+        onChanged: (date) {
+          setState(() => _vtvExpiry = date);
+          _markDirty();
+        },
       ),
       const SizedBox(height: 12),
       TextFormField(
@@ -610,7 +677,10 @@ class _VehicleFormScreenState extends ConsumerState<VehicleFormScreen> {
       _DatePickerField(
         label: 'Vencimiento Seguro',
         value: _insuranceExpiry,
-        onChanged: (date) => setState(() => _insuranceExpiry = date),
+        onChanged: (date) {
+          setState(() => _insuranceExpiry = date);
+          _markDirty();
+        },
       ),
       const SizedBox(height: 32),
     ];
@@ -713,6 +783,7 @@ class _VehicleFormScreenState extends ConsumerState<VehicleFormScreen> {
 
       if (mounted) {
         if (success) {
+          _hasChanges = false;
           context.pop();
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
