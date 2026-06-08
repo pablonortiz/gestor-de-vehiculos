@@ -7,14 +7,22 @@ on:
     branches: [master]
 
 jobs:
-  analyze:
+  analyze-and-test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: 3.x
+          flutter-version: 3.38.7
           cache: true
       - run: flutter pub get
-      - name: Flutter analyze
-        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+      # El .env está gitignored pero es un asset declarado en pubspec; lo creamos
+      # desde el example para que pub get/build no fallen por el asset faltante.
+      - name: Preparar .env
+        run: cp .env.example .env
+      - name: Analyze
+        # --no-fatal-infos: quedan deprecaciones (withOpacity → withValues, #U7) por
+        # limpiar; los warnings sí deben romper el build.
+        run: flutter analyze --no-fatal-infos
+      - name: Test
+        run: flutter test

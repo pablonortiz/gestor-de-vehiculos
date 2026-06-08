@@ -18,28 +18,28 @@ final locationRepositoryProvider = Provider((ref) {
 // ============================================================
 
 /// Cities by province
-final citiesByProvinceProvider = FutureProvider.family<List<City>, int>((ref, provinceId) async {
+final citiesByProvinceProvider = FutureProvider.autoDispose.family<List<City>, int>((ref, provinceId) async {
   ref.watch(locationsChangeProvider);
   final repository = ref.watch(locationRepositoryProvider);
   return repository.getCitiesByProvince(provinceId);
 });
 
 /// Search cities in a province
-final citySearchProvider = FutureProvider.family<List<City>, ({int provinceId, String query})>((ref, params) async {
+final citySearchProvider = FutureProvider.autoDispose.family<List<City>, ({int provinceId, String query})>((ref, params) async {
   ref.watch(locationsChangeProvider);
   final repository = ref.watch(locationRepositoryProvider);
   return repository.searchCities(params.provinceId, params.query);
 });
 
 /// City by ID
-final cityByIdProvider = FutureProvider.family<City?, String>((ref, id) async {
+final cityByIdProvider = FutureProvider.autoDispose.family<City?, String>((ref, id) async {
   ref.watch(locationsChangeProvider);
   final repository = ref.watch(locationRepositoryProvider);
   return repository.getCityById(id);
 });
 
 /// Vehicle count by city in a province
-final vehicleCountByCityProvider = FutureProvider.family<Map<String, int>, int>((ref, provinceId) async {
+final vehicleCountByCityProvider = FutureProvider.autoDispose.family<Map<String, int>, int>((ref, provinceId) async {
   ref.watch(locationsChangeProvider);
   final repository = ref.watch(locationRepositoryProvider);
   return repository.getVehicleCountByCity(provinceId);
@@ -50,28 +50,28 @@ final vehicleCountByCityProvider = FutureProvider.family<Map<String, int>, int>(
 // ============================================================
 
 /// Lugares by city
-final lugaresByCityProvider = FutureProvider.family<List<Lugar>, String>((ref, cityId) async {
+final lugaresByCityProvider = FutureProvider.autoDispose.family<List<Lugar>, String>((ref, cityId) async {
   ref.watch(locationsChangeProvider);
   final repository = ref.watch(locationRepositoryProvider);
   return repository.getLugaresByCity(cityId);
 });
 
 /// Search lugares in a city
-final lugarSearchProvider = FutureProvider.family<List<Lugar>, ({String cityId, String query})>((ref, params) async {
+final lugarSearchProvider = FutureProvider.autoDispose.family<List<Lugar>, ({String cityId, String query})>((ref, params) async {
   ref.watch(locationsChangeProvider);
   final repository = ref.watch(locationRepositoryProvider);
   return repository.searchLugares(params.cityId, params.query);
 });
 
 /// Lugar by ID
-final lugarByIdProvider = FutureProvider.family<Lugar?, String>((ref, id) async {
+final lugarByIdProvider = FutureProvider.autoDispose.family<Lugar?, String>((ref, id) async {
   ref.watch(locationsChangeProvider);
   final repository = ref.watch(locationRepositoryProvider);
   return repository.getLugarById(id);
 });
 
 /// Vehicle count by lugar in a city
-final vehicleCountByLugarProvider = FutureProvider.family<Map<String, int>, String>((ref, cityId) async {
+final vehicleCountByLugarProvider = FutureProvider.autoDispose.family<Map<String, int>, String>((ref, cityId) async {
   ref.watch(locationsChangeProvider);
   final repository = ref.watch(locationRepositoryProvider);
   return repository.getVehicleCountByLugar(cityId);

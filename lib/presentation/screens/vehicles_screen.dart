@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../widgets/error_retry_view.dart';
 import '../../core/config/supabase_config.dart';
 import '../../core/constants/provinces.dart';
 import '../../core/constants/vehicle_constants.dart';
@@ -169,7 +170,10 @@ class _VehiclesScreenState extends ConsumerState<VehiclesScreen> {
                 );
               },
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(child: Text('Error: $e')),
+              error: (e, _) => ErrorRetryView(
+                message: 'No se pudieron cargar los vehículos',
+                onRetry: () => ref.read(vehicleNotifierProvider.notifier).refresh(),
+              ),
             ),
           ),
         ],

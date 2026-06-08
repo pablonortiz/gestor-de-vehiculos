@@ -1,0 +1,118 @@
+import 'models/vehicle.dart';
+import 'models/fuel_charge.dart';
+import 'models/maintenance.dart';
+
+/// Gasto consolidado (combustible + mantenimiento) de un vehículo.
+class VehicleExpense {
+  final String vehicleId;
+  final String label;
+  final double fuelTotal;
+  final double maintenanceTotal;
+
+  const VehicleExpense({
+    required this.vehicleId,
+    required this.label,
+    required this.fuelTotal,
+    required this.maintenanceTotal,
+  });
+
+  double get total => fuelTotal + maintenanceTotal;
+}
+
+/// Gasto consolidado de un mes.
+class MonthlyExpense {
+  final int year;
+  final int month;
+  final double fuelTotal;
+  final double maintenanceTotal;
+
+  const MonthlyExpense({
+    required this.year,
+    required this.month,
+    required this.fuelTotal,
+    required this.maintenanceTotal,
+  });
+
+  double get total => fuelTotal + maintenanceTotal;
+}
+
+/// Dashboard de gastos: por vehículo (ranking) y por mes (tendencia).
+class ExpenseDashboard {
+  final List<VehicleExpense> byVehicle;
+  final List<MonthlyExpense> byMonth;
+
+  const ExpenseDashboard({required this.byVehicle, required this.byMonth});
+
+  double get fuelTotal =>
+      byMonth.fold(0.0, (sum, m) => sum + m.fuelTotal);
+  double get maintenanceTotal =>
+      byMonth.fold(0.0, (sum, m) => sum + m.maintenanceTotal);
+  double get grandTotal => fuelTotal + maintenanceTotal;
+}
+
+/// Construye el dashboard de gastos de los últimos [months] meses (incluido el
+/// actual). Considera combustible (price de cada carga) y mantenimiento
+/// (cost ?? 0). Solo cuenta registros desde el inicio del primer mes del rango.
+/// Pura y testeable.
+ExpenseDashboard buildExpenseDashboard({
+  required List<Vehicle> vehicles,
+  required List<FuelCharge> fuelCharges,
+  required List<Maintenance> maintenances,
+  required DateTime now,
+  int months = 6,
+}) {
+  // Lista de (año, mes) del rango, del más viejo al actual.
+  final monthsRange = List.generate(months, (i) {
+    final m = DateTime(now.year, now.month - (months - 1 - i));
+    return (year: m.year, month: m.month);
+  });
+  final cutoff = DateTime(monthsRange.first.year, monthsRange.first.month);
+
+  bool inRange(DateTime d) => !d.isBefore(cutoff) && !d.isAfter(now);
+  String monthKey(int year, int month) => '$year-$month';
+
+  // Acumuladores.
+  final fuelByVehicle = <String, double>{};
+  final maintByVehicle = <String, double>{};
+  final fuelByMonth = <String, double>{};
+  final maintByMonth = <String, double>{};
+
+  for (final charge in fuelCharges) {
+    if (!inRange(charge.date)) continue;
+    fuelByVehicle.update(charge.vehicleId, (v) => v + charge.price,
+        ifAbsent: () => charge.price);
+    final key = monthKey(charge.date.year, charge.date.month);
+    fuelByMonth.update(key, (v) => v + charge.price, ifAbsent: () => charge.price);
+  }
+
+  for (final maintenance in maintenances) {
+    final cost = maintenance.cost ?? 0;
+    if (cost == 0 || !inRange(maintenance.date)) continue;
+    maintByVehicle.update(maintenance.vehicleId, (v) => v + cost,
+        ifAbsent: () => cost);
+    final key = monthKey(maintenance.date.year, maintenance.date.month);
+    maintByMonth.update(key, (v) => v + cost, ifAbsent: () => cost);
+  }
+
+  final byVehicle = vehicles
+      .map((v) => VehicleExpense(
+            vehicleId: v.id ?? '',
+            label: '${v.displayName} (${v.plate})',
+            fuelTotal: fuelByVehicle[v.id] ?? 0,
+            maintenanceTotal: maintByVehicle[v.id] ?? 0,
+          ))
+      .where((e) => e.total > 0)
+      .toList()
+    ..sort((a, b) => b.total.compareTo(a.total));
+
+  final byMonth = monthsRange
+      .map((m) => MonthlyExpense(
+            year: m.year,
+            month: m.month,
+            fuelTotal: fuelByMonth[monthKey(m.year, m.month)] ?? 0,
+            maintenanceTotal: maintByMonth[monthKey(m.year, m.month)] ?? 0,
+          ))
+      .toList();
+
+  return ExpenseDashboard(byVehicle: byVehicle, byMonth: byMonth);
+}

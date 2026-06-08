@@ -35,7 +35,7 @@ class City {
       name: name ?? this.name,
       nameNormalized: nameNormalized ?? (name != null ? TextNormalizer.normalize(name) : this.nameNormalized),
       createdAt: createdAt ?? this.createdAt,
-      updatedAt: updatedAt ?? DateTime.now(),
+      updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 

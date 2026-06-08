@@ -1,9 +1,9 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
@@ -23,6 +23,11 @@ import '../../data/services/pdf_service.dart';
 import '../providers/vehicle_provider.dart';
 import '../providers/fuel_charge_provider.dart';
 import '../widgets/vehicle_icon.dart';
+import '../widgets/fuel_summary_card.dart';
+import '../../core/utils/contact_launcher.dart';
+import '../../core/utils/confirm_dialog.dart';
+import '../../core/utils/thousands_formatter.dart';
+import '../widgets/error_retry_view.dart';
 
 part 'vehicle_detail/photos_section.dart';
 part 'vehicle_detail/document_photos_section.dart';
@@ -248,7 +253,7 @@ class VehicleDetailScreen extends ConsumerWidget {
                           vehicleId: vehicleId,
                         ),
                         loading: () => const SizedBox.shrink(),
-                        error: (_, __) => const SizedBox.shrink(),
+                        error: (_, _) => const SizedBox.shrink(),
                       ),
 
                       // Contacto del responsable
@@ -319,7 +324,7 @@ class VehicleDetailScreen extends ConsumerWidget {
                                     icon: Icons.message,
                                     label: 'WhatsApp',
                                     color: const Color(0xFF25D366),
-                                    onTap: () => _openWhatsApp(vehicle.responsiblePhone),
+                                    onTap: () => ContactLauncher.openWhatsApp(vehicle.responsiblePhone),
                                   ),
                                 ),
                               ],
@@ -445,7 +450,7 @@ class VehicleDetailScreen extends ConsumerWidget {
                           vehicleId: vehicleId,
                         ),
                         loading: () => const SizedBox.shrink(),
-                        error: (_, __) => const SizedBox.shrink(),
+                        error: (_, _) => const SizedBox.shrink(),
                       ),
 
                       // Mantenimientos
@@ -466,7 +471,7 @@ class VehicleDetailScreen extends ConsumerWidget {
                           vehicleId: vehicleId,
                         ),
                         loading: () => const SizedBox.shrink(),
-                        error: (_, __) => const SizedBox.shrink(),
+                        error: (_, _) => const SizedBox.shrink(),
                       ),
                       const SizedBox(height: 24),
 
@@ -502,50 +507,20 @@ class VehicleDetailScreen extends ConsumerWidget {
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: $e')),
+        error: (e, _) => ErrorRetryView(
+          message: 'No se pudo cargar el vehículo',
+          onRetry: () => ref.invalidate(vehicleByIdProvider(vehicleId)),
+        ),
       ),
     );
   }
 
   Future<void> _makePhoneCall(BuildContext context, String phoneNumber) async {
     final messenger = ScaffoldMessenger.of(context);
-    final cleanNumber = phoneNumber.replaceAll(RegExp(r'[^\d+]'), '');
-    final uri = Uri.parse('tel:$cleanNumber');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
-    } else {
+    if (!await ContactLauncher.callPhone(phoneNumber)) {
       messenger.showSnackBar(
         const SnackBar(content: Text('No se pudo iniciar la llamada')),
       );
-    }
-  }
-
-  Future<void> _openWhatsApp(String phoneNumber) async {
-    String cleanNumber = phoneNumber.replaceAll(RegExp(r'[^\d]'), '');
-
-    if (cleanNumber.startsWith('0')) {
-      cleanNumber = cleanNumber.substring(1);
-    }
-
-    if (cleanNumber.length > 2) {
-      final areaCode = cleanNumber.substring(0, 2);
-      final rest = cleanNumber.substring(2);
-      if (rest.startsWith('15')) {
-        cleanNumber = areaCode + rest.substring(2);
-      }
-    }
-
-    if (!cleanNumber.startsWith('54')) {
-      cleanNumber = '549$cleanNumber';
-    }
-
-    final uri = Uri.parse('https://wa.me/$cleanNumber');
-
-    try {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } catch (e) {
-      final androidUri = Uri.parse('whatsapp://send?phone=$cleanNumber');
-      await launchUrl(androidUri);
     }
   }
 

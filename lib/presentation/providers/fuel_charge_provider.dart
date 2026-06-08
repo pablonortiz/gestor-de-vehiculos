@@ -13,7 +13,7 @@ final fuelChargeRepositoryProvider = Provider((ref) {
 });
 
 // Cargas de combustible de un vehículo
-final fuelChargesByVehicleProvider = FutureProvider.family<List<FuelCharge>, String>((ref, vehicleId) async {
+final fuelChargesByVehicleProvider = FutureProvider.autoDispose.family<List<FuelCharge>, String>((ref, vehicleId) async {
   ref.watch(fuelChargesChangeProvider);
   final repository = ref.watch(fuelChargeRepositoryProvider);
   return repository.getFuelChargesByVehicle(vehicleId);
@@ -44,14 +44,14 @@ class MonthlyFuelParams {
 }
 
 // Cargas de combustible por mes
-final fuelChargesByMonthProvider = FutureProvider.family<List<FuelCharge>, MonthlyFuelParams>((ref, params) async {
+final fuelChargesByMonthProvider = FutureProvider.autoDispose.family<List<FuelCharge>, MonthlyFuelParams>((ref, params) async {
   ref.watch(fuelChargesChangeProvider);
   final repository = ref.watch(fuelChargeRepositoryProvider);
   return repository.getFuelChargesByMonth(params.vehicleId, params.year, params.month);
 });
 
 // Resumen mensual
-final fuelChargeSummaryProvider = FutureProvider.family<FuelChargeSummary, MonthlyFuelParams>((ref, params) async {
+final fuelChargeSummaryProvider = FutureProvider.autoDispose.family<FuelChargeSummary, MonthlyFuelParams>((ref, params) async {
   ref.watch(fuelChargesChangeProvider);
   final repository = ref.watch(fuelChargeRepositoryProvider);
   return repository.getMonthlySummary(params.vehicleId, params.year, params.month);
@@ -82,7 +82,7 @@ class DateRangeFuelParams {
 }
 
 // Cargas de combustible por rango de fechas
-final fuelChargesByDateRangeProvider = FutureProvider.family<List<FuelCharge>, DateRangeFuelParams>((ref, params) async {
+final fuelChargesByDateRangeProvider = FutureProvider.autoDispose.family<List<FuelCharge>, DateRangeFuelParams>((ref, params) async {
   ref.watch(fuelChargesChangeProvider);
   final repository = ref.watch(fuelChargeRepositoryProvider);
   return repository.getFuelChargesByDateRange(params.vehicleId, params.startDate, params.endDate);
@@ -110,14 +110,14 @@ class ChartDataParams {
 }
 
 // Datos mensuales para gráficos
-final fuelChartDataProvider = FutureProvider.family<List<MonthlyFuelData>, ChartDataParams>((ref, params) async {
+final fuelChartDataProvider = FutureProvider.autoDispose.family<List<MonthlyFuelData>, ChartDataParams>((ref, params) async {
   ref.watch(fuelChargesChangeProvider);
   final repository = ref.watch(fuelChargeRepositoryProvider);
   return repository.getMonthlyChartData(params.vehicleId, months: params.months);
 });
 
 // Últimas cargas de combustible de un vehículo
-final recentFuelChargesProvider = FutureProvider.family<List<FuelCharge>, String>((ref, vehicleId) async {
+final recentFuelChargesProvider = FutureProvider.autoDispose.family<List<FuelCharge>, String>((ref, vehicleId) async {
   ref.watch(fuelChargesChangeProvider);
   final repository = ref.watch(fuelChargeRepositoryProvider);
   return repository.getRecentFuelCharges(vehicleId, limit: 3);

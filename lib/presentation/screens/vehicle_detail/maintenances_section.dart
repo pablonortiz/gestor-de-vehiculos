@@ -85,6 +85,12 @@ class _MaintenancesSectionState extends ConsumerState<_MaintenancesSection> {
   }
 
   Future<void> _deleteMaintenance(Maintenance maintenance) async {
+    if (!await confirmDelete(context,
+        title: 'Eliminar mantenimiento',
+        message: '¿Eliminar este mantenimiento y sus facturas? No se puede deshacer.')) {
+      return;
+    }
+    if (!mounted) return;
     setState(() => _isDeleting = true);
     try {
       final maintenanceRepo = ref.read(maintenanceRepositoryProvider);
@@ -119,13 +125,16 @@ class _MaintenanceFormSheet extends ConsumerStatefulWidget {
 }
 
 class _MaintenanceFormSheetState extends ConsumerState<_MaintenanceFormSheet> {
+  final _formKey = GlobalKey<FormState>();
   late final TextEditingController _dateController;
   late final TextEditingController _detailController;
+  late final TextEditingController _costController;
   late DateTime? _selectedDate;
   late List<MaintenanceInvoice> _existingInvoices;
   final List<PlatformFile> _pendingFiles = [];
   bool _isSaving = false;
   bool _isSelectingFiles = false;
+  bool _hasChanges = false;
 
   bool get _isEditing => widget.maintenance != null;
 
@@ -139,14 +148,41 @@ class _MaintenanceFormSheetState extends ConsumerState<_MaintenanceFormSheet> {
           : '',
     );
     _detailController = TextEditingController(text: maintenance?.detail ?? '');
+    _costController = TextEditingController(
+      text: maintenance?.cost != null
+          ? formatWithDots(maintenance!.cost!.toStringAsFixed(0))
+          : '',
+    );
     _selectedDate = maintenance?.date;
     _existingInvoices = List.from(maintenance?.invoices ?? []);
+    _dateController.addListener(_markDirty);
+    _detailController.addListener(_markDirty);
+    _costController.addListener(_markDirty);
+  }
+
+  void _markDirty() {
+    if (!_hasChanges) _hasChanges = true;
+  }
+
+  Future<void> _attemptClose() async {
+    final dirty = _hasChanges || _pendingFiles.isNotEmpty;
+    if (dirty) {
+      final discard = await confirmDelete(
+        context,
+        title: 'Descartar cambios',
+        message: 'Tenés cambios sin guardar. ¿Querés descartarlos?',
+        confirmLabel: 'Descartar',
+      );
+      if (!discard) return;
+    }
+    if (mounted) Navigator.pop(context);
   }
 
   @override
   void dispose() {
     _dateController.dispose();
     _detailController.dispose();
+    _costController.dispose();
     super.dispose();
   }
 
@@ -159,7 +195,9 @@ class _MaintenanceFormSheetState extends ConsumerState<_MaintenanceFormSheet> {
       child: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
-          child: Column(
+          child: Form(
+            key: _formKey,
+            child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -174,7 +212,7 @@ class _MaintenanceFormSheetState extends ConsumerState<_MaintenanceFormSheet> {
                     ),
                   ),
                   IconButton(
-                    onPressed: _isSaving ? null : () => Navigator.pop(context),
+                    onPressed: _isSaving ? null : _attemptClose,
                     icon: const Icon(Icons.close),
                   ),
                 ],
@@ -184,6 +222,7 @@ class _MaintenanceFormSheetState extends ConsumerState<_MaintenanceFormSheet> {
                 controller: _dateController,
                 readOnly: true,
                 enabled: !_isSaving,
+                validator: (_) => _selectedDate == null ? 'Completá la fecha' : null,
                 decoration: const InputDecoration(
                   labelText: 'Fecha *',
                   prefixIcon: Icon(Icons.calendar_today),
@@ -211,6 +250,20 @@ class _MaintenanceFormSheetState extends ConsumerState<_MaintenanceFormSheet> {
                 decoration: const InputDecoration(
                   labelText: 'Detalle *',
                   alignLabelWithHint: true,
+                ),
+                validator: (v) =>
+                    (v == null || v.trim().isEmpty) ? 'Completá el detalle' : null,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _costController,
+                keyboardType: TextInputType.number,
+                enabled: !_isSaving,
+                inputFormatters: [ThousandsSeparatorFormatter()],
+                decoration: const InputDecoration(
+                  labelText: 'Costo',
+                  prefixText: '\$ ',
+                  hintText: 'Opcional',
                 ),
               ),
               const SizedBox(height: 16),
@@ -280,8 +333,15 @@ class _MaintenanceFormSheetState extends ConsumerState<_MaintenanceFormSheet> {
                         style: const TextStyle(fontSize: 12),
                       ),
                       onDeleted: _isSaving ? null : () async {
+                        if (!await confirmDelete(context,
+                            title: 'Eliminar factura',
+                            message: '¿Eliminar esta factura? No se puede deshacer.')) {
+                          return;
+                        }
+                        if (!mounted) return;
                         final maintenanceRepo = ref.read(maintenanceRepositoryProvider);
                         await maintenanceRepo.deleteInvoice(invoice.id!);
+                        if (!mounted) return;
                         setState(() {
                           _existingInvoices.remove(invoice);
                         });
@@ -340,23 +400,22 @@ class _MaintenanceFormSheetState extends ConsumerState<_MaintenanceFormSheet> {
               ),
             ],
           ),
+          ),
         ),
       ),
     );
   }
 
   Future<void> _save() async {
-    if (_selectedDate == null || _detailController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Completá la fecha y el detalle')),
-      );
-      return;
-    }
+    if (!(_formKey.currentState?.validate() ?? false)) return;
 
     setState(() => _isSaving = true);
 
     try {
       final maintenanceRepo = ref.read(maintenanceRepositoryProvider);
+      final cost = _costController.text.trim().isEmpty
+          ? null
+          : double.tryParse(_costController.text.replaceAll('.', ''));
       String maintenanceId;
 
       if (_isEditing) {
@@ -364,6 +423,7 @@ class _MaintenanceFormSheetState extends ConsumerState<_MaintenanceFormSheet> {
           widget.maintenance!.copyWith(
             date: _selectedDate,
             detail: _detailController.text,
+            cost: cost,
           ),
         );
         maintenanceId = widget.maintenance!.id!;
@@ -372,6 +432,7 @@ class _MaintenanceFormSheetState extends ConsumerState<_MaintenanceFormSheet> {
           vehicleId: widget.vehicleId,
           date: _selectedDate!,
           detail: _detailController.text,
+          cost: cost,
         ));
       }
 

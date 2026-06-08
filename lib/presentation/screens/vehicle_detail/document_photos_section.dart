@@ -20,20 +20,27 @@ class _DocumentPhotosSectionState extends ConsumerState<_DocumentPhotosSection> 
 
   @override
   Widget build(BuildContext context) {
+    // Agrupar las fotos por tipo en una sola pasada, en vez de filtrar la lista
+    // completa una vez por cada DocumentType en cada build.
+    final photosByType = <DocumentType, List<DocumentPhoto>>{};
+    for (final photo in widget.photos) {
+      (photosByType[photo.documentType] ??= []).add(photo);
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const _SectionTitle(title: 'Documentos'),
         const SizedBox(height: 12),
-        ...DocumentType.values.map((type) => _buildDocumentTypeSection(type)),
+        ...DocumentType.values.map(
+          (type) => _buildDocumentTypeSection(type, photosByType[type] ?? const []),
+        ),
         const SizedBox(height: 24),
       ],
     );
   }
 
-  Widget _buildDocumentTypeSection(DocumentType type) {
-    final photosForType = widget.photos.where((p) => p.documentType == type).toList();
-
+  Widget _buildDocumentTypeSection(
+      DocumentType type, List<DocumentPhoto> photosForType) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
@@ -126,10 +133,10 @@ class _DocumentPhotosSectionState extends ConsumerState<_DocumentPhotosSection> 
                             : CachedNetworkImage(
                                 imageUrl: photo.cloudinaryUrl,
                                 fit: BoxFit.cover,
-                                placeholder: (_, __) => const Center(
+                                placeholder: (_, _) => const Center(
                                   child: CircularProgressIndicator(strokeWidth: 2),
                                 ),
-                                errorWidget: (_, __, ___) => const Icon(Icons.error),
+                                errorWidget: (_, _, _) => const Icon(Icons.error),
                               ),
                       ),
                     ),
@@ -191,38 +198,16 @@ class _DocumentPhotosSectionState extends ConsumerState<_DocumentPhotosSection> 
       final cloudinary = CloudinaryService.instance;
       final docPhotoRepo = ref.read(documentPhotoRepositoryProvider);
 
-      if (source == 'camera') {
-        final result = await cloudinary.uploadFromCamera();
-        if (result != null) {
-          await docPhotoRepo.insertPhoto(DocumentPhoto(
-            vehicleId: widget.vehicleId,
-            documentType: type,
-            cloudinaryUrl: result.url,
-            cloudinaryPublicId: result.publicId,
-          ));
-        }
-      } else if (source == 'gallery') {
-        final results = await cloudinary.uploadMultipleFromGallery();
-        for (final result in results) {
-          await docPhotoRepo.insertPhoto(DocumentPhoto(
-            vehicleId: widget.vehicleId,
-            documentType: type,
-            cloudinaryUrl: result.url,
-            cloudinaryPublicId: result.publicId,
-          ));
-        }
-      } else if (source == 'file') {
-        final results = await cloudinary.uploadMultipleInvoices();
-        for (final result in results) {
-          await docPhotoRepo.insertPhoto(DocumentPhoto(
-            vehicleId: widget.vehicleId,
-            documentType: type,
-            cloudinaryUrl: result.url,
-            cloudinaryPublicId: result.publicId,
-            isPdf: result.isPdf,
-            fileName: result.fileName,
-          ));
-        }
+      final results = await cloudinary.pickAndUpload(source);
+      for (final result in results) {
+        await docPhotoRepo.insertPhoto(DocumentPhoto(
+          vehicleId: widget.vehicleId,
+          documentType: type,
+          cloudinaryUrl: result.url,
+          cloudinaryPublicId: result.publicId,
+          isPdf: result.isPdf,
+          fileName: result.fileName,
+        ));
       }
 
       ref.invalidate(documentPhotosByVehicleProvider(widget.vehicleId));
@@ -265,6 +250,12 @@ class _DocumentPhotosSectionState extends ConsumerState<_DocumentPhotosSection> 
               title: const Text('Eliminar', style: TextStyle(color: AppTheme.error)),
               onTap: () async {
                 Navigator.pop(ctx);
+                if (!await confirmDelete(context,
+                    title: 'Eliminar documento',
+                    message: '¿Eliminar esta foto del documento? No se puede deshacer.')) {
+                  return;
+                }
+                if (!mounted) return;
                 final docPhotoRepo = ref.read(documentPhotoRepositoryProvider);
                 try {
                   await docPhotoRepo.deletePhoto(photo.id!);

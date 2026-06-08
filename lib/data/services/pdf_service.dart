@@ -1,7 +1,6 @@
 import 'dart:typed_data';
 import 'dart:ui' show Color;
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -14,6 +13,8 @@ import '../../domain/models/document_photo.dart';
 import '../../domain/models/maintenance.dart';
 import '../../domain/models/fuel_charge.dart';
 import '../../domain/models/vehicle_note.dart';
+import 'fuel_stats.dart';
+import 'pdf_image_downloader.dart';
 
 class PdfService {
   // Colores del tema para PDF (fondo blanco, amigable para impresión)
@@ -31,13 +32,7 @@ class PdfService {
     required List<DocumentPhoto> documentPhotos,
     required List<Maintenance> maintenances,
   }) async {
-    final pdf = pw.Document(
-      theme: pw.ThemeData.withFont(
-        base: await PdfGoogleFonts.robotoRegular(),
-        bold: await PdfGoogleFonts.robotoBold(),
-        italic: await PdfGoogleFonts.robotoItalic(),
-      ),
-    );
+    final pdf = await _createDocument();
 
     // Recolectar y descargar (en paralelo) todas las imágenes antes de armar las páginas.
     final photoAttachments = _photoAttachments(photos);
@@ -911,53 +906,21 @@ class PdfService {
   }
 
   /// Descarga una imagen desde URL
-  static Future<Uint8List?> _downloadImage(String url) async {
-    try {
-      final response = await http
-          .get(Uri.parse(url))
-          .timeout(const Duration(seconds: 20));
-      if (response.statusCode == 200) {
-        return response.bodyBytes;
-      }
-    } catch (e) {
-      debugPrint('🖼️ [PDF] Error descarga imagen: $url -> $e');
-    }
-    return null;
+  // Documento PDF con la fuente Roboto (base/bold/italic) ya configurada.
+  static Future<pw.Document> _createDocument() async {
+    return pw.Document(
+      theme: pw.ThemeData.withFont(
+        base: await PdfGoogleFonts.robotoRegular(),
+        bold: await PdfGoogleFonts.robotoBold(),
+        italic: await PdfGoogleFonts.robotoItalic(),
+      ),
+    );
   }
 
-  /// Descarga un PDF desde una URL y retorna los bytes
-  static Future<Uint8List?> downloadPdfBytes(String url) async {
-    try {
-      debugPrint('📄 [PDF] Descargando: $url');
-      final response = await http
-          .get(Uri.parse(url))
-          .timeout(const Duration(seconds: 20));
-      debugPrint('📄 [PDF] Status: ${response.statusCode}, Size: ${response.bodyBytes.length}');
-      if (response.statusCode == 200 && response.bodyBytes.length > 10) {
-        return response.bodyBytes;
-      }
-      debugPrint('📄 [PDF] Respuesta no válida');
-    } catch (e) {
-      debugPrint('📄 [PDF] Error descarga: $e');
-    }
-    return null;
-  }
-
-  /// Descarga un PDF y lo rasteriza a imágenes PNG
-  static Future<List<Uint8List>> _downloadAndRasterizePdf(String url, {double dpi = 150}) async {
-    try {
-      final pdfBytes = await downloadPdfBytes(url);
-      if (pdfBytes == null) return [];
-
-      final pages = <Uint8List>[];
-      await for (final page in Printing.raster(pdfBytes, dpi: dpi)) {
-        pages.add(await page.toPng());
-      }
-      return pages;
-    } catch (e) {
-      return [];
-    }
-  }
+  /// Descarga un PDF desde una URL y retorna los bytes. Wrapper para los callers
+  /// externos (preview); la implementación vive en PdfImageDownloader.
+  static Future<Uint8List?> downloadPdfBytes(String url) =>
+      PdfImageDownloader.downloadPdfBytes(url);
 
   /// Agrega páginas de un PDF adjunto al documento generado
   static Future<void> _addPdfAttachmentPages(
@@ -965,7 +928,7 @@ class PdfService {
     String cloudinaryUrl,
     String? fileName,
   ) async {
-    final pages = await _downloadAndRasterizePdf(cloudinaryUrl);
+    final pages = await PdfImageDownloader.downloadAndRasterizePdf(cloudinaryUrl);
     if (pages.isNotEmpty) {
       for (int i = 0; i < pages.length; i++) {
         final caption = pages.length > 1
@@ -990,7 +953,7 @@ class PdfService {
     for (int i = 0; i < imageAttachments.length; i += _downloadBatchSize) {
       final batch = imageAttachments.skip(i).take(_downloadBatchSize).toList();
       final results = await Future.wait(
-        batch.map((a) => _downloadImage(a.url)),
+        batch.map((a) => PdfImageDownloader.downloadImage(a.url)),
       );
       for (int j = 0; j < batch.length; j++) {
         batch[j].imageBytes = results[j];
@@ -1029,7 +992,7 @@ class PdfService {
   static void _addFuelSummaryPage(
     pw.Document pdf,
     Vehicle vehicle,
-    _FuelStats stats,
+    FuelStats stats,
     DateTime startDate,
     DateTime endDate,
     bool ascending, {
@@ -1185,7 +1148,7 @@ class PdfService {
   }
 
   /// Agrega las páginas de la tabla de cargas de combustible.
-  static void _addFuelTablePages(pw.Document pdf, _FuelStats stats) {
+  static void _addFuelTablePages(pw.Document pdf, FuelStats stats) {
     final sortedCharges = stats.sortedCharges;
     if (sortedCharges.isEmpty) return;
 
@@ -1338,15 +1301,9 @@ class PdfService {
     required DateTime endDate,
     required bool ascending,
   }) async {
-    final pdf = pw.Document(
-      theme: pw.ThemeData.withFont(
-        base: await PdfGoogleFonts.robotoRegular(),
-        bold: await PdfGoogleFonts.robotoBold(),
-        italic: await PdfGoogleFonts.robotoItalic(),
-      ),
-    );
+    final pdf = await _createDocument();
 
-    final stats = _FuelStats.from(fuelCharges, ascending);
+    final stats = FuelStats.from(fuelCharges, ascending);
 
     // Page 1: Header + Vehicle Info + Summary Stats
     _addFuelSummaryPage(
@@ -1404,13 +1361,7 @@ class PdfService {
     required DateTime endDate,
     required bool ascending,
   }) async {
-    final pdf = pw.Document(
-      theme: pw.ThemeData.withFont(
-        base: await PdfGoogleFonts.robotoRegular(),
-        bold: await PdfGoogleFonts.robotoBold(),
-        italic: await PdfGoogleFonts.robotoItalic(),
-      ),
-    );
+    final pdf = await _createDocument();
 
     final dateFormat = DateFormat('dd/MM/yyyy');
 
@@ -1460,7 +1411,7 @@ class PdfService {
     }
 
     // ===== PARTE 2: REPORTE DE COMBUSTIBLE =====
-    final stats = _FuelStats.from(fuelCharges, ascending);
+    final stats = FuelStats.from(fuelCharges, ascending);
 
     // Fuel summary page
     _addFuelSummaryPage(
@@ -1494,7 +1445,7 @@ class PdfService {
 
   /// Descarga y rasteriza un PDF externo a imágenes PNG (para preview en la app)
   static Future<List<Uint8List>> rasterizePdfFromUrl(String url, {double dpi = 200}) async {
-    return _downloadAndRasterizePdf(url, dpi: dpi);
+    return PdfImageDownloader.downloadAndRasterizePdf(url, dpi: dpi);
   }
 }
 
@@ -1515,53 +1466,3 @@ class _Attachment {
   });
 }
 
-/// Estadísticas agregadas del período de combustible.
-class _FuelStats {
-  final List<FuelCharge> sortedCharges;
-  final double totalLiters;
-  final double totalPrice;
-  final double avgPricePerLiter;
-  final double avgLitersPerCharge;
-  final String? avgKmBetweenCharges;
-
-  _FuelStats._({
-    required this.sortedCharges,
-    required this.totalLiters,
-    required this.totalPrice,
-    required this.avgPricePerLiter,
-    required this.avgLitersPerCharge,
-    required this.avgKmBetweenCharges,
-  });
-
-  factory _FuelStats.from(List<FuelCharge> fuelCharges, bool ascending) {
-    final numberFormat = NumberFormat('#,###');
-
-    final sortedCharges = List<FuelCharge>.from(fuelCharges);
-    sortedCharges.sort((a, b) => ascending
-        ? a.date.compareTo(b.date)
-        : b.date.compareTo(a.date));
-
-    final totalLiters = sortedCharges.fold<double>(0, (sum, c) => sum + c.liters);
-    final totalPrice = sortedCharges.fold<double>(0, (sum, c) => sum + c.price);
-    final avgPricePerLiter = totalLiters > 0 ? totalPrice / totalLiters : 0.0;
-    final avgLitersPerCharge = sortedCharges.isNotEmpty ? totalLiters / sortedCharges.length : 0.0;
-
-    String? avgKmBetweenCharges;
-    final chargesWithOdometer = sortedCharges.where((c) => c.odometer != null).toList();
-    chargesWithOdometer.sort((a, b) => a.date.compareTo(b.date));
-    if (chargesWithOdometer.length >= 2) {
-      final totalKm = chargesWithOdometer.last.odometer! - chargesWithOdometer.first.odometer!;
-      final avgKm = totalKm / (chargesWithOdometer.length - 1);
-      avgKmBetweenCharges = '${numberFormat.format(avgKm.round())} km';
-    }
-
-    return _FuelStats._(
-      sortedCharges: sortedCharges,
-      totalLiters: totalLiters,
-      totalPrice: totalPrice,
-      avgPricePerLiter: avgPricePerLiter,
-      avgLitersPerCharge: avgLitersPerCharge,
-      avgKmBetweenCharges: avgKmBetweenCharges,
-    );
-  }
-}

@@ -77,7 +77,7 @@ class FuelCharge {
       displayFileName: displayFileName ?? this.displayFileName,
       notes: notes ?? this.notes,
       createdAt: createdAt ?? this.createdAt,
-      updatedAt: updatedAt ?? DateTime.now(),
+      updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 

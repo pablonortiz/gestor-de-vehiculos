@@ -19,6 +19,15 @@ class CloudinaryUploadResult {
   });
 }
 
+/// Error de subida a Cloudinary (red, preset inválido, etc.). Permite a los
+/// callers distinguir un fallo real de "el usuario canceló el picker" (null).
+class CloudinaryUploadException implements Exception {
+  final String message;
+  CloudinaryUploadException(this.message);
+  @override
+  String toString() => message;
+}
+
 class CloudinaryService {
   static final CloudinaryService instance = CloudinaryService._();
   final ImagePicker _imagePicker = ImagePicker();
@@ -35,8 +44,8 @@ class CloudinaryService {
     );
     
     if (image == null) return null;
-    
-    return await _uploadFile(File(image.path), isPdf: false);
+
+    return await _uploadFile(File(image.path), isPdf: false, throwOnError: true);
   }
 
   // Subir imagen desde galería
@@ -45,10 +54,10 @@ class CloudinaryService {
       source: ImageSource.gallery,
       imageQuality: 80,
     );
-    
+
     if (image == null) return null;
-    
-    return await _uploadFile(File(image.path), isPdf: false);
+
+    return await _uploadFile(File(image.path), isPdf: false, throwOnError: true);
   }
 
   // Subir múltiples imágenes desde galería
@@ -64,7 +73,14 @@ class CloudinaryService {
         results.add(result);
       }
     }
-    
+
+    final failed = images.length - results.length;
+    if (failed > 0) {
+      debugPrint(
+        'Subida múltiple de galería: $failed de ${images.length} archivos fallaron',
+      );
+    }
+
     return results;
   }
 
@@ -86,6 +102,7 @@ class CloudinaryService {
       File(file.path!),
       isPdf: isPdf,
       fileName: file.name,
+      throwOnError: true,
     );
   }
 
@@ -125,10 +142,31 @@ class CloudinaryService {
   }
 
   // Subir archivo a Cloudinary
+  // Centraliza el branching de origen (cámara / galería / archivo) y devuelve
+  // los resultados de subida. Los callers solo persisten cada resultado en su
+  // repo, evitando reimplementar este flujo en cada sección.
+  Future<List<CloudinaryUploadResult>> pickAndUpload(String source) async {
+    switch (source) {
+      case 'camera':
+        final result = await uploadFromCamera();
+        return result != null ? [result] : [];
+      case 'gallery':
+        return uploadMultipleFromGallery();
+      case 'file':
+        return uploadMultipleInvoices();
+      default:
+        return [];
+    }
+  }
+
+  // Subir archivo a Cloudinary. Devuelve null en error salvo que throwOnError
+  // sea true (subidas single, donde el caller necesita distinguir fallo de
+  // cancelación). Los loops/subidas múltiples usan null para saltear y seguir.
   Future<CloudinaryUploadResult?> _uploadFile(
     File file, {
     required bool isPdf,
     String? fileName,
+    bool throwOnError = false,
   }) async {
     try {
       final response = await _cloudinary.uploadFile(
@@ -147,6 +185,9 @@ class CloudinaryService {
       );
     } catch (e) {
       debugPrint('Error subiendo archivo a Cloudinary: $e');
+      if (throwOnError) {
+        throw CloudinaryUploadException('No se pudo subir el archivo: $e');
+      }
       return null;
     }
   }

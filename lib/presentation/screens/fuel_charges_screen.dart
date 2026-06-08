@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
+import '../widgets/error_retry_view.dart';
 import '../../domain/models/fuel_charge.dart';
 import '../providers/fuel_charge_provider.dart';
 import '../widgets/month_navigator.dart';
@@ -38,6 +39,8 @@ class _FuelChargesScreenState extends ConsumerState<FuelChargesScreen> {
     final chartDataAsync = ref.watch(fuelChartDataProvider(
       ChartDataParams(vehicleId: widget.vehicleId, months: 6),
     ));
+    final allChargesAsync =
+        ref.watch(fuelChargesByVehicleProvider(widget.vehicleId));
 
     return Scaffold(
       appBar: AppBar(
@@ -88,15 +91,19 @@ class _FuelChargesScreenState extends ConsumerState<FuelChargesScreen> {
                         padding: EdgeInsets.all(32),
                         child: CircularProgressIndicator(),
                       ),
-                      error: (e, _) => Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Text('Error: $e'),
+                      error: (e, _) => ErrorRetryView(
+                        message: 'No se pudo cargar el resumen',
+                        onRetry: () =>
+                            ref.invalidate(fuelChargeSummaryProvider(chargesParams)),
                       ),
                     ),
                     // Charts section (collapsible)
                     if (_showCharts)
                       chartDataAsync.when(
-                        data: (data) => FuelCharts(data: data),
+                        data: (data) => FuelCharts(
+                          data: data,
+                          charges: allChargesAsync.valueOrNull ?? const [],
+                        ),
                         loading: () => const Padding(
                           padding: EdgeInsets.all(32),
                           child: CircularProgressIndicator(),
@@ -115,7 +122,7 @@ class _FuelChargesScreenState extends ConsumerState<FuelChargesScreen> {
                                 Icon(
                                   Icons.local_gas_station_outlined,
                                   size: 64,
-                                  color: AppTheme.textSecondary.withOpacity(0.5),
+                                  color: AppTheme.textSecondary.withValues(alpha: 0.5),
                                 ),
                                 const SizedBox(height: 16),
                                 const Text(
@@ -142,9 +149,10 @@ class _FuelChargesScreenState extends ConsumerState<FuelChargesScreen> {
                         padding: EdgeInsets.all(32),
                         child: CircularProgressIndicator(),
                       ),
-                      error: (e, _) => Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Text('Error: $e'),
+                      error: (e, _) => ErrorRetryView(
+                        message: 'No se pudieron cargar las cargas',
+                        onRetry: () =>
+                            ref.invalidate(fuelChargesByMonthProvider(chargesParams)),
                       ),
                     ),
                     const SizedBox(height: 80), // Space for FAB

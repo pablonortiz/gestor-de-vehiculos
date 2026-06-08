@@ -108,7 +108,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
     return resultsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (_, __) => const Center(
+      error: (_, _) => const Center(
         child: Text(
           'Error al buscar',
           style: TextStyle(color: AppTheme.textSecondary),

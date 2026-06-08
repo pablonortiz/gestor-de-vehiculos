@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -48,9 +49,17 @@ class SyncState {
 }
 
 class SyncService extends StateNotifier<SyncState> {
-  SyncService() : super(SyncState());
+  SyncService() : super(SyncState()) {
+    // Al recuperar conectividad, sincronizar: de lo contrario la cola de
+    // pendientes solo se drena al reabrir la app o con pull-to-refresh manual.
+    // fullSync tiene su propio guard de re-entrada y chequeo de online.
+    _connectivitySub = Connectivity().onConnectivityChanged.listen((result) {
+      if (result != ConnectivityResult.none) fullSync();
+    });
+  }
 
   final _db = DatabaseHelper.instance;
+  StreamSubscription<ConnectivityResult>? _connectivitySub;
 
   // Ventana corta para ignorar el "eco" de realtime de nuestras propias
   // escrituras: Supabase emite eventos PostgresChange también por los writes de
@@ -141,19 +150,21 @@ class SyncService extends StateNotifier<SyncState> {
       };
       debugPrint('📥 [SYNC] Recibidos ${raw['vehicles']!.length} vehículos de Supabase');
 
-      // Normalizar shape Supabase → local vía los modelos.
+      // Normalizar shape Supabase → local vía los modelos. Cada fila se parsea
+      // de forma aislada: una fila corrupta se descarta (con log) sin abortar la
+      // sincronización entera del resto de las tablas.
       final data = <String, List<Map<String, dynamic>>>{
-        'cities': [for (final d in raw['cities']!) City.fromSupabase(d).toMap()],
-        'lugares': [for (final d in raw['lugares']!) Lugar.fromSupabase(d).toMap()],
-        'vehicles': [for (final d in raw['vehicles']!) Vehicle.fromSupabase(d).toMap()],
-        'vehicle_history': [for (final d in raw['vehicle_history']!) VehicleHistory.fromSupabase(d).toMap()],
-        'maintenances': [for (final d in raw['maintenances']!) Maintenance.fromSupabase(d).toMap()],
-        'maintenance_invoices': [for (final d in raw['maintenance_invoices']!) MaintenanceInvoice.fromSupabase(d).toMap()],
-        'vehicle_notes': [for (final d in raw['vehicle_notes']!) VehicleNote.fromSupabase(d).toMap()],
-        'note_photos': [for (final d in raw['note_photos']!) NotePhoto.fromSupabase(d).toMap()],
-        'vehicle_photos': [for (final d in raw['vehicle_photos']!) VehiclePhoto.fromSupabase(d).toMap()],
-        'document_photos': [for (final d in raw['document_photos']!) DocumentPhoto.fromSupabase(d).toMap()],
-        'fuel_charges': [for (final d in raw['fuel_charges']!) FuelCharge.fromSupabase(d).toMap()],
+        'cities': _normalizeRows(raw['cities']!, (d) => City.fromSupabase(d).toMap(), 'cities'),
+        'lugares': _normalizeRows(raw['lugares']!, (d) => Lugar.fromSupabase(d).toMap(), 'lugares'),
+        'vehicles': _normalizeRows(raw['vehicles']!, (d) => Vehicle.fromSupabase(d).toMap(), 'vehicles'),
+        'vehicle_history': _normalizeRows(raw['vehicle_history']!, (d) => VehicleHistory.fromSupabase(d).toMap(), 'vehicle_history'),
+        'maintenances': _normalizeRows(raw['maintenances']!, (d) => Maintenance.fromSupabase(d).toMap(), 'maintenances'),
+        'maintenance_invoices': _normalizeRows(raw['maintenance_invoices']!, (d) => MaintenanceInvoice.fromSupabase(d).toMap(), 'maintenance_invoices'),
+        'vehicle_notes': _normalizeRows(raw['vehicle_notes']!, (d) => VehicleNote.fromSupabase(d).toMap(), 'vehicle_notes'),
+        'note_photos': _normalizeRows(raw['note_photos']!, (d) => NotePhoto.fromSupabase(d).toMap(), 'note_photos'),
+        'vehicle_photos': _normalizeRows(raw['vehicle_photos']!, (d) => VehiclePhoto.fromSupabase(d).toMap(), 'vehicle_photos'),
+        'document_photos': _normalizeRows(raw['document_photos']!, (d) => DocumentPhoto.fromSupabase(d).toMap(), 'document_photos'),
+        'fuel_charges': _normalizeRows(raw['fuel_charges']!, (d) => FuelCharge.fromSupabase(d).toMap(), 'fuel_charges'),
       };
 
       // Reemplazo atómico (borra + reinserta en una transacción, sin tocar sync_queue).
@@ -191,6 +202,51 @@ class SyncService extends StateNotifier<SyncState> {
     }
   }
   
+  /// Normaliza filas remotas a shape local tolerando filas corruptas: una fila
+  /// que falle al parsear se descarta (con log) en vez de abortar todo el batch.
+  List<Map<String, dynamic>> _normalizeRows(
+    List<Map<String, dynamic>> rows,
+    Map<String, dynamic> Function(Map<String, dynamic>) parse,
+    String table,
+  ) {
+    final result = <Map<String, dynamic>>[];
+    for (final row in rows) {
+      try {
+        result.add(parse(row));
+      } catch (e) {
+        debugPrint('⚠️ [SYNC] Fila inválida en $table descartada: $e');
+      }
+    }
+    return result;
+  }
+
+  /// Sube un registro pendiente resolviendo el conflicto por updated_at: solo
+  /// pisa el remoto si la versión local es estrictamente más nueva. En cualquier
+  /// caso marca la fila local como sincronizada (si el remoto era más nuevo, se
+  /// baja en la fase de descarga del fullSync).
+  Future<void> _pushUnsynced({
+    required String table,
+    required String id,
+    required DateTime localUpdatedAt,
+    required Map<String, dynamic> payload,
+  }) async {
+    final db = await _db.database;
+    final client = SupabaseConfig.client;
+    final existing =
+        await client.from(table).select('id, updated_at').eq('id', id).maybeSingle();
+    if (existing == null) {
+      await client.from(table).insert(payload);
+    } else {
+      final remoteUpdatedAt =
+          DateTime.tryParse(existing['updated_at']?.toString() ?? '');
+      if (remoteUpdatedAt == null || localUpdatedAt.isAfter(remoteUpdatedAt)) {
+        await client.from(table).update(payload).eq('id', id);
+      }
+      // Si el remoto es más nuevo o igual, no lo pisamos: se baja en el fetch.
+    }
+    await db.update(table, {'synced': 1}, where: 'id = ?', whereArgs: [id]);
+  }
+
   // Subir datos locales no sincronizados
   Future<void> _uploadUnsyncedData() async {
     final db = await _db.database;
@@ -204,21 +260,13 @@ class SyncService extends StateNotifier<SyncState> {
       for (final map in unsyncedCities) {
         try {
           final city = City.fromMap(map);
-          final existing = await client
-              .from('cities')
-              .select('id')
-              .eq('id', city.id!)
-              .maybeSingle();
-
-          if (existing == null) {
-            await client.from('cities').insert(city.toSupabase());
-            debugPrint('✅ [SYNC] Ciudad ${city.name} insertada en Supabase');
-          } else {
-            await client.from('cities').update(city.toSupabase()).eq('id', city.id!);
-            debugPrint('✅ [SYNC] Ciudad ${city.name} actualizada en Supabase');
-          }
-
-          await db.update('cities', {'synced': 1}, where: 'id = ?', whereArgs: [city.id]);
+          await _pushUnsynced(
+            table: 'cities',
+            id: city.id!,
+            localUpdatedAt: city.updatedAt,
+            payload: city.toSupabase(),
+          );
+          debugPrint('✅ [SYNC] Ciudad ${city.name} sincronizada');
         } catch (e) {
           debugPrint('❌ [SYNC] Error subiendo ciudad: $e');
         }
@@ -235,21 +283,13 @@ class SyncService extends StateNotifier<SyncState> {
       for (final map in unsyncedLugares) {
         try {
           final lugar = Lugar.fromMap(map);
-          final existing = await client
-              .from('lugares')
-              .select('id')
-              .eq('id', lugar.id!)
-              .maybeSingle();
-
-          if (existing == null) {
-            await client.from('lugares').insert(lugar.toSupabase());
-            debugPrint('✅ [SYNC] Lugar ${lugar.name} insertado en Supabase');
-          } else {
-            await client.from('lugares').update(lugar.toSupabase()).eq('id', lugar.id!);
-            debugPrint('✅ [SYNC] Lugar ${lugar.name} actualizado en Supabase');
-          }
-
-          await db.update('lugares', {'synced': 1}, where: 'id = ?', whereArgs: [lugar.id]);
+          await _pushUnsynced(
+            table: 'lugares',
+            id: lugar.id!,
+            localUpdatedAt: lugar.updatedAt,
+            payload: lugar.toSupabase(),
+          );
+          debugPrint('✅ [SYNC] Lugar ${lugar.name} sincronizado');
         } catch (e) {
           debugPrint('❌ [SYNC] Error subiendo lugar: $e');
         }
@@ -266,26 +306,13 @@ class SyncService extends StateNotifier<SyncState> {
       try {
         final vehicle = Vehicle.fromMap(map);
         debugPrint('📤 [SYNC] Subiendo vehículo: ${vehicle.plate}');
-        
-        // Verificar si ya existe en Supabase
-        final existing = await client
-            .from('vehicles')
-            .select('id')
-            .eq('id', vehicle.id!)
-            .maybeSingle();
-        
-        if (existing == null) {
-          // Insertar nuevo
-          await client.from('vehicles').insert(vehicle.toSupabase());
-          debugPrint('✅ [SYNC] Vehículo ${vehicle.plate} insertado en Supabase');
-        } else {
-          // Actualizar existente
-          await client.from('vehicles').update(vehicle.toSupabase()).eq('id', vehicle.id!);
-          debugPrint('✅ [SYNC] Vehículo ${vehicle.plate} actualizado en Supabase');
-        }
-        
-        // Marcar como sincronizado localmente
-        await db.update('vehicles', {'synced': 1}, where: 'id = ?', whereArgs: [vehicle.id]);
+        await _pushUnsynced(
+          table: 'vehicles',
+          id: vehicle.id!,
+          localUpdatedAt: vehicle.updatedAt,
+          payload: vehicle.toSupabase(),
+        );
+        debugPrint('✅ [SYNC] Vehículo ${vehicle.plate} sincronizado');
       } catch (e) {
         debugPrint('❌ [SYNC] Error subiendo vehículo: $e');
       }
@@ -319,21 +346,13 @@ class SyncService extends StateNotifier<SyncState> {
       for (final map in unsyncedFuelCharges) {
         try {
           final fuelCharge = FuelCharge.fromMap(map);
-          final existing = await client
-              .from('fuel_charges')
-              .select('id')
-              .eq('id', fuelCharge.id!)
-              .maybeSingle();
-
-          if (existing == null) {
-            await client.from('fuel_charges').insert(fuelCharge.toSupabase());
-            debugPrint('✅ [SYNC] Carga de combustible insertada en Supabase');
-          } else {
-            await client.from('fuel_charges').update(fuelCharge.toSupabase()).eq('id', fuelCharge.id!);
-            debugPrint('✅ [SYNC] Carga de combustible actualizada en Supabase');
-          }
-
-          await db.update('fuel_charges', {'synced': 1}, where: 'id = ?', whereArgs: [fuelCharge.id]);
+          await _pushUnsynced(
+            table: 'fuel_charges',
+            id: fuelCharge.id!,
+            localUpdatedAt: fuelCharge.updatedAt,
+            payload: fuelCharge.toSupabase(),
+          );
+          debugPrint('✅ [SYNC] Carga de combustible sincronizada');
         } catch (e) {
           debugPrint('❌ [SYNC] Error subiendo carga de combustible: $e');
         }
@@ -433,6 +452,12 @@ class SyncService extends StateNotifier<SyncState> {
     if (await isOnline && SupabaseConfig.isConfigured) {
       await _processSyncQueue();
     }
+  }
+
+  @override
+  void dispose() {
+    _connectivitySub?.cancel();
+    super.dispose();
   }
 }
 

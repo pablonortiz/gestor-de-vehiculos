@@ -48,7 +48,7 @@ class FuelChargeCard extends StatelessWidget {
                   width: 50,
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   decoration: BoxDecoration(
-                    color: AppTheme.accentPrimary.withOpacity(0.1),
+                    color: AppTheme.accentPrimary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Column(
@@ -120,7 +120,7 @@ class FuelChargeCard extends StatelessWidget {
                             Icon(
                               Icons.speed,
                               size: 12,
-                              color: AppTheme.textSecondary.withOpacity(0.7),
+                              color: AppTheme.textSecondary.withValues(alpha: 0.7),
                             ),
                             const SizedBox(width: 2),
                             Text(
@@ -139,7 +139,7 @@ class FuelChargeCard extends StatelessWidget {
                           fuelCharge.notes!,
                           style: TextStyle(
                             fontSize: 11,
-                            color: AppTheme.textSecondary.withOpacity(0.8),
+                            color: AppTheme.textSecondary.withValues(alpha: 0.8),
                             fontStyle: FontStyle.italic,
                           ),
                           maxLines: 1,
@@ -185,7 +185,7 @@ class FuelChargeCard extends StatelessWidget {
                         child: Icon(
                           Icons.delete_outline,
                           size: 20,
-                          color: AppTheme.error.withOpacity(0.7),
+                          color: AppTheme.error.withValues(alpha: 0.7),
                         ),
                       ),
                   ],
@@ -216,7 +216,7 @@ class _PhotoIndicator extends StatelessWidget {
         width: 28,
         height: 28,
         decoration: BoxDecoration(
-          color: AppTheme.accentPrimary.withOpacity(0.15),
+          color: AppTheme.accentPrimary.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(6),
         ),
         child: Icon(
@@ -241,10 +241,10 @@ class _PhotoIndicator extends StatelessWidget {
               child: CachedNetworkImage(
                 imageUrl: url,
                 fit: BoxFit.contain,
-                placeholder: (_, __) => const Center(
+                placeholder: (_, _) => const Center(
                   child: CircularProgressIndicator(),
                 ),
-                errorWidget: (_, __, ___) => const Icon(Icons.error),
+                errorWidget: (_, _, _) => const Icon(Icons.error),
               ),
             ),
             Padding(

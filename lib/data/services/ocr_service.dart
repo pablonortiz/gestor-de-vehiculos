@@ -25,15 +25,15 @@ class OcrService {
   static final OcrService instance = OcrService._internal();
   OcrService._internal();
 
-  TextRecognizer? _textRecognizer;
-
-  TextRecognizer get textRecognizer {
-    _textRecognizer ??= TextRecognizer(script: TextRecognitionScript.latin);
-    return _textRecognizer!;
-  }
+  // Techo plausible para un gasto de combustible: descarta CUIT (11 dígitos),
+  // números de comprobante y otros tokens grandes que no son el total.
+  static const double _maxPlausiblePrice = 10000000;
+  // Rango plausible de litros de una carga.
+  static const double _maxPlausibleLiters = 200;
 
   // Extract liters from a pump display photo
   Future<OcrResult> extractLiters(File imageFile) async {
+    final recognizer = TextRecognizer(script: TextRecognitionScript.latin);
     try {
       debugPrint('OCR: Starting liters extraction from ${imageFile.path}');
 
@@ -43,9 +43,7 @@ class OcrService {
       }
 
       final inputImage = InputImage.fromFile(imageFile);
-      debugPrint('OCR: InputImage created, processing...');
-
-      final recognizedText = await textRecognizer.processImage(inputImage);
+      final recognizedText = await recognizer.processImage(inputImage);
       final fullText = recognizedText.text;
 
       debugPrint('OCR Text for liters (${fullText.length} chars): $fullText');
@@ -55,64 +53,10 @@ class OcrService {
         return OcrResult.failure(fullText);
       }
 
-      // Keyword-anchored patterns: high confidence, take the first match.
-      final keywordPatterns = [
-        // "45.50 L" or "45,50 L"
-        RegExp(r'(\d{1,3}[.,]\d{1,3})\s*[Ll](?:itros?)?', caseSensitive: false),
-        // "Litros: 45.50" or "Litros 45,50"
-        RegExp(r'[Ll]itros?:?\s*(\d{1,3}[.,]\d{1,3})', caseSensitive: false),
-        // "Vol: 45.50" or "VOL 45,50"
-        RegExp(r'[Vv][Oo][Ll](?:umen)?:?\s*(\d{1,3}[.,]\d{1,3})'),
-      ];
-
-      for (final pattern in keywordPatterns) {
-        final match = pattern.firstMatch(fullText);
-        if (match != null) {
-          final rawValue = match.group(1)!;
-          final normalizedValue = rawValue.replaceAll(',', '.');
-          final value = double.tryParse(normalizedValue);
-
-          debugPrint('OCR: Pattern matched "$rawValue", parsed as $value');
-
-          if (value != null && value > 0 && value <= 200) {
-            debugPrint('OCR: Liters extracted: $value from "$rawValue"');
-            return OcrResult.found(value, rawValue, fullText);
-          }
-        }
-      }
-
-      // Standalone decimal fallback: scan all matches, discard date/time-looking
-      // values, and pick the most plausible liters reading.
-      final standalonePattern = RegExp(r'\b(\d{1,3}[.,]\d{1,3})\b');
-      // Matches dd.mm / hh.mm style tokens (e.g. "12.05", "08.30").
-      final dateTimeLike = RegExp(r'^([0-2]?\d|3[01])[.,][0-5]\d$');
-
-      String? bestRaw;
-      double? bestValue;
-      for (final match in standalonePattern.allMatches(fullText)) {
-        final rawValue = match.group(1)!;
-        if (dateTimeLike.hasMatch(rawValue)) {
-          debugPrint('OCR: Skipping date/time-like value "$rawValue"');
-          continue;
-        }
-        final value = double.tryParse(rawValue.replaceAll(',', '.'));
-        if (value == null || value <= 0 || value > 200) continue;
-
-        // Prefer values in the typical refuel range (10-100 L); among those,
-        // keep the largest. If none qualify, fall back to the largest valid.
-        final candidateInRange = value >= 10 && value <= 100;
-        final bestInRange = bestValue != null && bestValue >= 10 && bestValue <= 100;
-        if (bestValue == null ||
-            (candidateInRange && !bestInRange) ||
-            (candidateInRange == bestInRange && value > bestValue)) {
-          bestValue = value;
-          bestRaw = rawValue;
-        }
-      }
-
-      if (bestValue != null && bestRaw != null) {
-        debugPrint('OCR: Liters extracted (standalone): $bestValue from "$bestRaw"');
-        return OcrResult.found(bestValue, bestRaw, fullText);
+      final parsed = parseLitersFromText(fullText);
+      if (parsed != null) {
+        debugPrint('OCR: Liters extracted: ${parsed.$1} from "${parsed.$2}"');
+        return OcrResult.found(parsed.$1, parsed.$2, fullText);
       }
 
       debugPrint('OCR: No valid liters pattern found in text');
@@ -121,11 +65,14 @@ class OcrService {
       debugPrint('OCR Error extracting liters: $e');
       debugPrint('OCR Stack trace: $stack');
       return OcrResult.failure();
+    } finally {
+      await recognizer.close();
     }
   }
 
   // Extract price from a receipt photo
   Future<OcrResult> extractPrice(File imageFile) async {
+    final recognizer = TextRecognizer(script: TextRecognitionScript.latin);
     try {
       debugPrint('OCR: Starting price extraction from ${imageFile.path}');
 
@@ -135,9 +82,7 @@ class OcrService {
       }
 
       final inputImage = InputImage.fromFile(imageFile);
-      debugPrint('OCR: InputImage created, processing...');
-
-      final recognizedText = await textRecognizer.processImage(inputImage);
+      final recognizedText = await recognizer.processImage(inputImage);
       final fullText = recognizedText.text;
 
       debugPrint('OCR Text for price (${fullText.length} chars): $fullText');
@@ -147,55 +92,10 @@ class OcrService {
         return OcrResult.failure(fullText);
       }
 
-      // Keyword/$-anchored patterns for Argentine prices: high confidence,
-      // take the first match.
-      final keywordPatterns = [
-        // "Total: $45.000,50" or "TOTAL $45.000,50"
-        RegExp(r'[Tt][Oo][Tt][Aa][Ll]:?\s*\$?\s*([\d.,]+)'),
-        // "Importe: $45.000,50" or "IMPORTE 45.000,50"
-        RegExp(r'[Ii]mporte:?\s*\$?\s*([\d.,]+)'),
-        // "A Pagar: $45.000,50"
-        RegExp(r'[Pp]agar:?\s*\$?\s*([\d.,]+)'),
-        // "$45.000,50" - any price with $ sign
-        RegExp(r'\$\s*([\d.,]+)'),
-      ];
-
-      for (final pattern in keywordPatterns) {
-        final match = pattern.firstMatch(fullText);
-        if (match != null) {
-          final rawValue = match.group(1)!;
-          final value = _parseArgentinePrice(rawValue);
-
-          debugPrint('OCR: Pattern matched "$rawValue", parsed as $value');
-
-          if (value != null && value > 100) {
-            debugPrint('OCR: Price extracted: $value from "$rawValue"');
-            return OcrResult.found(value, rawValue, fullText);
-          }
-        }
-      }
-
-      // Standalone number fallback: scan all candidates and pick the largest
-      // plausible value, since the total is typically the biggest figure on
-      // the ticket (avoids grabbing the first number like a date or CUIT).
-      final standalonePattern =
-          RegExp(r'\b(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{2})?)\b');
-
-      String? bestRaw;
-      double? bestValue;
-      for (final match in standalonePattern.allMatches(fullText)) {
-        final rawValue = match.group(1)!;
-        final value = _parseArgentinePrice(rawValue);
-        if (value == null || value <= 100) continue;
-        if (bestValue == null || value > bestValue) {
-          bestValue = value;
-          bestRaw = rawValue;
-        }
-      }
-
-      if (bestValue != null && bestRaw != null) {
-        debugPrint('OCR: Price extracted (standalone): $bestValue from "$bestRaw"');
-        return OcrResult.found(bestValue, bestRaw, fullText);
+      final parsed = parsePriceFromText(fullText);
+      if (parsed != null) {
+        debugPrint('OCR: Price extracted: ${parsed.$1} from "${parsed.$2}"');
+        return OcrResult.found(parsed.$1, parsed.$2, fullText);
       }
 
       debugPrint('OCR: No valid price pattern found in text');
@@ -204,43 +104,137 @@ class OcrService {
       debugPrint('OCR Error extracting price: $e');
       debugPrint('OCR Stack trace: $stack');
       return OcrResult.failure();
+    } finally {
+      await recognizer.close();
     }
+  }
+
+  /// Parsea los litros del texto OCR. Devuelve (valor, textoCrudo) o null.
+  /// Separado del OCR para poder testearlo con texto fijo.
+  @visibleForTesting
+  (double, String)? parseLitersFromText(String fullText) {
+    // Patrones anclados por keyword: alta confianza. El decimal es opcional para
+    // tolerar lecturas enteras del surtidor (ej. "45 L").
+    final keywordPatterns = [
+      // "45 L" / "45.50 L" / "45,50 litros"
+      RegExp(r'(\d{1,3}(?:[.,]\d{1,3})?)\s*[Ll](?:itros?)?', caseSensitive: false),
+      // "Litros: 45.50" / "Litros 45"
+      RegExp(r'[Ll]itros?:?\s*(\d{1,3}(?:[.,]\d{1,3})?)', caseSensitive: false),
+      // "Vol: 45.50" / "VOL 45"
+      RegExp(r'[Vv][Oo][Ll](?:umen)?:?\s*(\d{1,3}(?:[.,]\d{1,3})?)'),
+    ];
+
+    for (final pattern in keywordPatterns) {
+      final match = pattern.firstMatch(fullText);
+      if (match != null) {
+        final rawValue = match.group(1)!;
+        final value = double.tryParse(rawValue.replaceAll(',', '.'));
+        if (value != null && value > 0 && value <= _maxPlausibleLiters) {
+          return (value, rawValue);
+        }
+      }
+    }
+
+    // Fallback sin keyword: exige decimal (un entero suelto es demasiado
+    // ambiguo) y descarta tokens con pinta de fecha/hora.
+    final standalonePattern = RegExp(r'\b(\d{1,3}[.,]\d{1,3})\b');
+    final dateTimeLike = RegExp(r'^([0-2]?\d|3[01])[.,][0-5]\d$');
+
+    String? bestRaw;
+    double? bestValue;
+    for (final match in standalonePattern.allMatches(fullText)) {
+      final rawValue = match.group(1)!;
+      if (dateTimeLike.hasMatch(rawValue)) continue;
+      final value = double.tryParse(rawValue.replaceAll(',', '.'));
+      if (value == null || value <= 0 || value > _maxPlausibleLiters) continue;
+
+      // Prefiere valores en el rango típico de carga (10-100 L); entre esos, el
+      // mayor. Si ninguno califica, cae al mayor válido.
+      final candidateInRange = value >= 10 && value <= 100;
+      final bestInRange = bestValue != null && bestValue >= 10 && bestValue <= 100;
+      if (bestValue == null ||
+          (candidateInRange && !bestInRange) ||
+          (candidateInRange == bestInRange && value > bestValue)) {
+        bestValue = value;
+        bestRaw = rawValue;
+      }
+    }
+
+    if (bestValue != null && bestRaw != null) return (bestValue, bestRaw);
+    return null;
+  }
+
+  /// Parsea el precio del texto OCR. Devuelve (valor, textoCrudo) o null.
+  /// Separado del OCR para poder testearlo con texto fijo.
+  @visibleForTesting
+  (double, String)? parsePriceFromText(String fullText) {
+    // Patrones anclados por keyword/$ para precios argentinos: alta confianza.
+    final keywordPatterns = [
+      RegExp(r'[Tt][Oo][Tt][Aa][Ll]:?\s*\$?\s*([\d.,]+)'),
+      RegExp(r'[Ii]mporte:?\s*\$?\s*([\d.,]+)'),
+      RegExp(r'[Pp]agar:?\s*\$?\s*([\d.,]+)'),
+      RegExp(r'\$\s*([\d.,]+)'),
+    ];
+
+    for (final pattern in keywordPatterns) {
+      final match = pattern.firstMatch(fullText);
+      if (match != null) {
+        final rawValue = match.group(1)!;
+        final value = _parseArgentinePrice(rawValue);
+        if (value != null && value > 100 && value < _maxPlausiblePrice) {
+          return (value, rawValue);
+        }
+      }
+    }
+
+    // Fallback sin keyword: el total suele ser la cifra más grande del ticket,
+    // pero acotada a un rango plausible para no agarrar el CUIT, el número de
+    // comprobante u otros tokens grandes que no son el total.
+    final standalonePattern =
+        RegExp(r'\b(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{2})?)\b');
+
+    String? bestRaw;
+    double? bestValue;
+    for (final match in standalonePattern.allMatches(fullText)) {
+      final rawValue = match.group(1)!;
+      final value = _parseArgentinePrice(rawValue);
+      if (value == null || value <= 100 || value >= _maxPlausiblePrice) continue;
+      if (bestValue == null || value > bestValue) {
+        bestValue = value;
+        bestRaw = rawValue;
+      }
+    }
+
+    if (bestValue != null && bestRaw != null) return (bestValue, bestRaw);
+    return null;
   }
 
   // Parse Argentine price format: "45.000,50" -> 45000.50
   double? _parseArgentinePrice(String priceStr) {
-    // Remove spaces
     String cleaned = priceStr.trim();
 
-    // Check if it has comma as decimal separator (Argentine format)
-    // Format: "45.000,50" means 45000.50
+    // Coma como separador decimal (formato argentino "45.000,50" = 45000.50).
     if (cleaned.contains(',')) {
-      // Split by comma to separate integer and decimal parts
       final parts = cleaned.split(',');
       if (parts.length == 2) {
-        // Remove dots from integer part (thousand separators)
         final integerPart = parts[0].replaceAll('.', '');
         final decimalPart = parts[1];
         cleaned = '$integerPart.$decimalPart';
       } else {
-        // Just comma, no decimal part
         cleaned = cleaned.replaceAll('.', '').replaceAll(',', '.');
       }
     } else if (cleaned.contains('.')) {
-      // Check if dots are thousand separators or decimal
-      // If there's only one dot and it's followed by 2 digits, it might be decimal
       final dotCount = '.'.allMatches(cleaned).length;
       if (dotCount > 1) {
-        // Multiple dots = thousand separators, no decimal
+        // Varios puntos = separadores de miles, sin decimal.
         cleaned = cleaned.replaceAll('.', '');
       } else {
-        // One dot - check if it's a thousand separator or decimal
         final afterDot = cleaned.split('.').last;
         if (afterDot.length == 3) {
-          // Likely a thousand separator
+          // Probable separador de miles.
           cleaned = cleaned.replaceAll('.', '');
         }
-        // else keep it as decimal separator
+        // Si no, se mantiene como separador decimal.
       }
     }
 

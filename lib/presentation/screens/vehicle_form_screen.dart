@@ -14,6 +14,8 @@ import '../providers/location_provider.dart';
 import '../widgets/vehicle_icon.dart';
 import '../widgets/city_autocomplete.dart';
 import '../widgets/lugar_autocomplete.dart';
+import '../../core/utils/confirm_dialog.dart';
+import '../../core/utils/thousands_formatter.dart';
 
 class VehicleFormScreen extends ConsumerStatefulWidget {
   final String? vehicleId;
@@ -52,6 +54,9 @@ class _VehicleFormScreenState extends ConsumerState<VehicleFormScreen> {
 
   bool _isLoading = false;
   bool _isEditing = false;
+  bool _hasChanges = false;
+  // Mientras es true (carga inicial), los cambios programáticos no marcan dirty.
+  bool _settingUp = true;
 
   @override
   void initState() {
@@ -67,6 +72,9 @@ class _VehicleFormScreenState extends ConsumerState<VehicleFormScreen> {
     _responsibleNameController = TextEditingController();
     _responsiblePhoneController = TextEditingController();
 
+    for (final c in _editableControllers) {
+      c.addListener(_markDirty);
+    }
     _plateController.addListener(() {
       setState(() {});
     });
@@ -74,18 +82,55 @@ class _VehicleFormScreenState extends ConsumerState<VehicleFormScreen> {
     if (widget.vehicleId != null) {
       _isEditing = true;
       _loadVehicle();
+    } else {
+      _settingUp = false;
+    }
+  }
+
+  List<TextEditingController> get _editableControllers => [
+        _plateController,
+        _brandController,
+        _modelController,
+        _yearController,
+        _kmController,
+        _insuranceCompanyController,
+        _cityController,
+        _lugarController,
+        _responsibleNameController,
+        _responsiblePhoneController,
+      ];
+
+  void _markDirty() {
+    if (_settingUp) return;
+    if (!_hasChanges) setState(() => _hasChanges = true);
+  }
+
+  Future<bool> _confirmDiscard() async {
+    if (!_hasChanges) return true;
+    return confirmDelete(
+      context,
+      title: 'Descartar cambios',
+      message: 'Tenés cambios sin guardar. ¿Querés descartarlos?',
+      confirmLabel: 'Descartar',
+    );
+  }
+
+  Future<void> _attemptClose() async {
+    if (await _confirmDiscard() && mounted) {
+      context.pop();
     }
   }
 
   Future<void> _loadVehicle() async {
     final vehicle = await ref.read(vehicleByIdProvider(widget.vehicleId!).future);
+    if (!mounted) return;
     if (vehicle != null) {
       setState(() {
         _plateController.text = vehicle.plate;
         _brandController.text = vehicle.brand;
         _modelController.text = vehicle.model;
         _yearController.text = vehicle.year.toString();
-        _kmController.text = vehicle.km.toString();
+        _kmController.text = formatWithDots(vehicle.km.toString());
         _insuranceCompanyController.text = vehicle.insuranceCompany ?? '';
         _cityController.text = vehicle.city;
         _lugarController.text = vehicle.lugar ?? '';
@@ -102,6 +147,7 @@ class _VehicleFormScreenState extends ConsumerState<VehicleFormScreen> {
         _insuranceExpiry = vehicle.insuranceExpiry;
       });
     }
+    _settingUp = false;
   }
 
   @override
@@ -147,6 +193,7 @@ class _VehicleFormScreenState extends ConsumerState<VehicleFormScreen> {
 
     if (fullContact == null) return;
 
+    if (!mounted) return;
     setState(() {
       // Nombre
       _responsibleNameController.text = fullContact.displayName;
@@ -172,7 +219,13 @@ class _VehicleFormScreenState extends ConsumerState<VehicleFormScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _attemptClose();
+      },
+      child: Scaffold(
       body: SafeArea(
         child: Form(
           key: _formKey,
@@ -184,420 +237,23 @@ class _VehicleFormScreenState extends ConsumerState<VehicleFormScreen> {
                 color: _selectedColor,
                 status: _selectedStatus,
                 title: _isEditing ? 'Editar Vehículo' : 'Nuevo Vehículo',
-                plate: _plateController.text.isNotEmpty 
-                    ? _plateController.text.toUpperCase() 
+                plate: _plateController.text.isNotEmpty
+                    ? _plateController.text.toUpperCase()
                     : null,
-                onClose: () => context.pop(),
+                onClose: _attemptClose,
               ),
-              
+
               // Contenido scrolleable
               Expanded(
                 child: ListView(
                   padding: const EdgeInsets.all(20),
                   children: [
-                    // Tipo de vehículo
-                    _SectionLabel(label: 'Tipo de Vehículo'),
-                    const SizedBox(height: 12),
-                    VehicleTypeSelector(
-                      selectedType: _selectedType,
-                      vehicleColor: _selectedColor,
-                      onSelected: (type) => setState(() => _selectedType = type),
-                    ),
-                    const SizedBox(height: 24),
-
-                    // Color
-                    _SectionLabel(label: 'Color'),
-                    const SizedBox(height: 12),
-                    VehicleColorSelector(
-                      selectedColor: _selectedColor,
-                      onSelected: (color) => setState(() => _selectedColor = color),
-                    ),
-                    const SizedBox(height: 24),
-
-                    // Patente
-                    _SectionLabel(label: 'Patente *'),
-                    const SizedBox(height: 8),
-                    TextFormField(
-                      controller: _plateController,
-                      textCapitalization: TextCapitalization.characters,
-                      decoration: const InputDecoration(
-                        hintText: 'Ej: AA123BB',
-                        prefixIcon: Icon(Icons.confirmation_number),
-                      ),
-                      inputFormatters: [
-                        UpperCaseTextFormatter(),
-                        FilteringTextInputFormatter.allow(RegExp(r'[A-Z0-9]')),
-                        LengthLimitingTextInputFormatter(10),
-                      ],
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Ingresá la patente';
-                        }
-                        if (value.length < 6) {
-                          return 'La patente debe tener al menos 6 caracteres';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Marca y Modelo
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _SectionLabel(label: 'Marca *'),
-                              const SizedBox(height: 8),
-                              TextFormField(
-                                controller: _brandController,
-                                textCapitalization: TextCapitalization.words,
-                                decoration: const InputDecoration(
-                                  hintText: 'Ej: Toyota',
-                                ),
-                                validator: (value) {
-                                  if (value == null || value.isEmpty) {
-                                    return 'Requerido';
-                                  }
-                                  return null;
-                                },
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _SectionLabel(label: 'Modelo *'),
-                              const SizedBox(height: 8),
-                              TextFormField(
-                                controller: _modelController,
-                                textCapitalization: TextCapitalization.words,
-                                decoration: const InputDecoration(
-                                  hintText: 'Ej: Hilux',
-                                ),
-                                validator: (value) {
-                                  if (value == null || value.isEmpty) {
-                                    return 'Requerido';
-                                  }
-                                  return null;
-                                },
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Año y Kilometraje
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _SectionLabel(label: 'Año *'),
-                              const SizedBox(height: 8),
-                              TextFormField(
-                                controller: _yearController,
-                                keyboardType: TextInputType.number,
-                                decoration: const InputDecoration(
-                                  hintText: '2024',
-                                ),
-                                inputFormatters: [
-                                  FilteringTextInputFormatter.digitsOnly,
-                                  LengthLimitingTextInputFormatter(4),
-                                ],
-                                validator: (value) {
-                                  if (value == null || value.isEmpty) {
-                                    return 'Requerido';
-                                  }
-                                  final year = int.tryParse(value);
-                                  if (year == null || year < 1900 || year > DateTime.now().year + 1) {
-                                    return 'Año inválido';
-                                  }
-                                  return null;
-                                },
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _SectionLabel(label: 'Kilometraje'),
-                              const SizedBox(height: 8),
-                              TextFormField(
-                                controller: _kmController,
-                                keyboardType: TextInputType.number,
-                                decoration: const InputDecoration(
-                                  hintText: '0',
-                                  suffixText: 'km',
-                                ),
-                                inputFormatters: [
-                                  FilteringTextInputFormatter.digitsOnly,
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Combustible
-                    _SectionLabel(label: 'Combustible'),
-                    const SizedBox(height: 8),
-                    DropdownButtonFormField<FuelType>(
-                      value: _selectedFuelType,
-                      decoration: const InputDecoration(
-                        prefixIcon: Icon(Icons.local_gas_station),
-                      ),
-                      items: FuelType.values.map((fuel) {
-                        return DropdownMenuItem(
-                          value: fuel,
-                          child: Row(
-                            children: [
-                              Icon(fuel.icon, size: 18, color: AppTheme.textSecondary),
-                              const SizedBox(width: 8),
-                              Text(fuel.label),
-                            ],
-                          ),
-                        );
-                      }).toList(),
-                      onChanged: (value) {
-                        if (value != null) setState(() => _selectedFuelType = value);
-                      },
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Estado
-                    _SectionLabel(label: 'Estado'),
-                    const SizedBox(height: 8),
-                    DropdownButtonFormField<VehicleStatus>(
-                      value: _selectedStatus,
-                      decoration: const InputDecoration(
-                        prefixIcon: Icon(Icons.info_outline),
-                      ),
-                      items: VehicleStatus.values.map((status) {
-                        return DropdownMenuItem(
-                          value: status,
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 10,
-                                height: 10,
-                                decoration: BoxDecoration(
-                                  color: status.color,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(status.label),
-                            ],
-                          ),
-                        );
-                      }).toList(),
-                      onChanged: (value) {
-                        if (value != null) setState(() => _selectedStatus = value);
-                      },
-                    ),
-                    const SizedBox(height: 24),
-
-                    const Divider(),
-                    const SizedBox(height: 24),
-
-                    // Ubicación
-                    _SectionLabel(label: 'Ubicación'),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<int>(
-                      value: _selectedProvinceId,
-                      decoration: const InputDecoration(
-                        labelText: 'Provincia *',
-                        prefixIcon: Icon(Icons.map),
-                      ),
-                      items: ArgentinaProvinces.all.map((province) {
-                        return DropdownMenuItem(
-                          value: province.id,
-                          child: Text(province.name),
-                        );
-                      }).toList(),
-                      onChanged: (value) {
-                        if (value != null) {
-                          setState(() {
-                            _selectedProvinceId = value;
-                            // Clear city and lugar when province changes
-                            _cityController.clear();
-                            _lugarController.clear();
-                            _selectedCityId = null;
-                            _selectedLugarId = null;
-                          });
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    CityAutocomplete(
-                      key: _cityAutocompleteKey,
-                      controller: _cityController,
-                      provinceId: _selectedProvinceId,
-                      initialCityId: _selectedCityId,
-                      onCitySelected: (city) {
-                        setState(() {
-                          _selectedCityId = city.id;
-                          // Clear lugar when city changes
-                          _lugarController.clear();
-                          _selectedLugarId = null;
-                        });
-                      },
-                      onCityTextChanged: (text) {
-                        // If user types something different, clear the selection
-                        if (_selectedCityId != null) {
-                          final cityAutocomplete = _cityAutocompleteKey.currentState;
-                          if (cityAutocomplete != null && !cityAutocomplete.hasMatchingCity) {
-                            setState(() {
-                              _selectedCityId = null;
-                              _lugarController.clear();
-                              _selectedLugarId = null;
-                            });
-                          }
-                        } else {
-                          // Rebuild so LugarAutocomplete gets the updated pendingCityText
-                          setState(() {});
-                        }
-                      },
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Ingresá la ciudad';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    LugarAutocomplete(
-                      key: _lugarAutocompleteKey,
-                      controller: _lugarController,
-                      cityId: _selectedCityId,
-                      initialLugarId: _selectedLugarId,
-                      // Pass city text when creating new city (cityId is null but text is entered)
-                      pendingCityText: _selectedCityId == null ? _cityController.text : null,
-                      onLugarSelected: (lugar) {
-                        setState(() {
-                          _selectedLugarId = lugar.id;
-                        });
-                      },
-                      onLugarTextChanged: (text) {
-                        if (_selectedLugarId != null) {
-                          final lugarAutocomplete = _lugarAutocompleteKey.currentState;
-                          if (lugarAutocomplete != null && !lugarAutocomplete.hasMatchingLugar) {
-                            setState(() {
-                              _selectedLugarId = null;
-                            });
-                          }
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 24),
-
-                    const Divider(),
-                    const SizedBox(height: 24),
-
-                    // Responsable
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const _SectionLabel(label: 'Responsable'),
-                        // El selector de contactos solo está disponible en móvil
-                        if (!kIsWeb)
-                          TextButton.icon(
-                            onPressed: _pickContact,
-                            icon: const Icon(Icons.contacts, size: 18),
-                            label: const Text('Importar contacto'),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _responsibleNameController,
-                      textCapitalization: TextCapitalization.words,
-                      decoration: const InputDecoration(
-                        labelText: 'Nombre *',
-                        hintText: 'Nombre completo',
-                        prefixIcon: Icon(Icons.person),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Ingresá el nombre del responsable';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _responsiblePhoneController,
-                      keyboardType: TextInputType.phone,
-                      decoration: const InputDecoration(
-                        labelText: 'Teléfono *',
-                        hintText: 'Ej: 1155667788',
-                        prefixIcon: Icon(Icons.phone),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Ingresá el teléfono';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 24),
-
-                    const Divider(),
-                    const SizedBox(height: 24),
-
-                    // Documentación
-                    _SectionLabel(label: 'Documentación'),
-                    const SizedBox(height: 12),
-                    _DatePickerField(
-                      label: 'Vencimiento VTV',
-                      value: _vtvExpiry,
-                      onChanged: (date) => setState(() => _vtvExpiry = date),
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _insuranceCompanyController,
-                      textCapitalization: TextCapitalization.words,
-                      decoration: const InputDecoration(
-                        labelText: 'Compañía de Seguro',
-                        hintText: 'Ej: La Segunda',
-                        prefixIcon: Icon(Icons.security),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    _DatePickerField(
-                      label: 'Vencimiento Seguro',
-                      value: _insuranceExpiry,
-                      onChanged: (date) => setState(() => _insuranceExpiry = date),
-                    ),
-                    const SizedBox(height: 32),
-
-                    // Botón guardar
-                    SizedBox(
-                      height: 52,
-                      child: ElevatedButton(
-                        onPressed: _isLoading ? null : _saveVehicle,
-                        child: _isLoading
-                            ? const SizedBox(
-                                width: 24,
-                                height: 24,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : Text(_isEditing ? 'Guardar Cambios' : 'Agregar Vehículo'),
-                      ),
-                    ),
+                    ..._buildTypeAndColorSection(),
+                    ..._buildVehicleDataSection(),
+                    ..._buildLocationSection(),
+                    ..._buildResponsibleSection(),
+                    ..._buildDocumentationSection(),
+                    _buildSaveButton(),
                     const SizedBox(height: 40),
                   ],
                 ),
@@ -605,6 +261,445 @@ class _VehicleFormScreenState extends ConsumerState<VehicleFormScreen> {
             ],
           ),
         ),
+      ),
+      ),
+    );
+  }
+
+  List<Widget> _buildTypeAndColorSection() {
+    return [
+      _SectionLabel(label: 'Tipo de Vehículo'),
+      const SizedBox(height: 12),
+      VehicleTypeSelector(
+        selectedType: _selectedType,
+        vehicleColor: _selectedColor,
+        onSelected: (type) {
+          setState(() => _selectedType = type);
+          _markDirty();
+        },
+      ),
+      const SizedBox(height: 24),
+      _SectionLabel(label: 'Color'),
+      const SizedBox(height: 12),
+      VehicleColorSelector(
+        selectedColor: _selectedColor,
+        onSelected: (color) {
+          setState(() => _selectedColor = color);
+          _markDirty();
+        },
+      ),
+      const SizedBox(height: 24),
+    ];
+  }
+
+  List<Widget> _buildVehicleDataSection() {
+    return [
+      // Patente
+      _SectionLabel(label: 'Patente *'),
+      const SizedBox(height: 8),
+      TextFormField(
+        controller: _plateController,
+        autofocus: !_isEditing,
+        textCapitalization: TextCapitalization.characters,
+        decoration: const InputDecoration(
+          hintText: 'Ej: AA123BB',
+          prefixIcon: Icon(Icons.confirmation_number),
+        ),
+        inputFormatters: [
+          UpperCaseTextFormatter(),
+          FilteringTextInputFormatter.allow(RegExp(r'[A-Z0-9]')),
+          LengthLimitingTextInputFormatter(10),
+        ],
+        validator: (value) {
+          if (value == null || value.isEmpty) {
+            return 'Ingresá la patente';
+          }
+          if (value.length < 6) {
+            return 'La patente debe tener al menos 6 caracteres';
+          }
+          return null;
+        },
+      ),
+      const SizedBox(height: 20),
+
+      // Marca y Modelo
+      Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _SectionLabel(label: 'Marca *'),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: _brandController,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: const InputDecoration(
+                    hintText: 'Ej: Toyota',
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Requerido';
+                    }
+                    return null;
+                  },
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _SectionLabel(label: 'Modelo *'),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: _modelController,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: const InputDecoration(
+                    hintText: 'Ej: Hilux',
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Requerido';
+                    }
+                    return null;
+                  },
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      const SizedBox(height: 20),
+
+      // Año y Kilometraje
+      Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _SectionLabel(label: 'Año *'),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: _yearController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    hintText: '2024',
+                  ),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(4),
+                  ],
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Requerido';
+                    }
+                    final year = int.tryParse(value);
+                    if (year == null || year < 1900 || year > DateTime.now().year + 1) {
+                      return 'Año inválido';
+                    }
+                    return null;
+                  },
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _SectionLabel(label: 'Kilometraje'),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: _kmController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    hintText: '0',
+                    suffixText: 'km',
+                  ),
+                  inputFormatters: [
+                    ThousandsSeparatorFormatter(),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      const SizedBox(height: 20),
+
+      // Combustible
+      _SectionLabel(label: 'Combustible'),
+      const SizedBox(height: 8),
+      DropdownButtonFormField<FuelType>(
+        value: _selectedFuelType,
+        decoration: const InputDecoration(
+          prefixIcon: Icon(Icons.local_gas_station),
+        ),
+        items: FuelType.values.map((fuel) {
+          return DropdownMenuItem(
+            value: fuel,
+            child: Row(
+              children: [
+                Icon(fuel.icon, size: 18, color: AppTheme.textSecondary),
+                const SizedBox(width: 8),
+                Text(fuel.label),
+              ],
+            ),
+          );
+        }).toList(),
+        onChanged: (value) {
+          if (value != null) {
+            setState(() => _selectedFuelType = value);
+            _markDirty();
+          }
+        },
+      ),
+      const SizedBox(height: 20),
+
+      // Estado
+      _SectionLabel(label: 'Estado'),
+      const SizedBox(height: 8),
+      DropdownButtonFormField<VehicleStatus>(
+        value: _selectedStatus,
+        decoration: const InputDecoration(
+          prefixIcon: Icon(Icons.info_outline),
+        ),
+        items: VehicleStatus.values.map((status) {
+          return DropdownMenuItem(
+            value: status,
+            child: Row(
+              children: [
+                Container(
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(
+                    color: status.color,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(status.label),
+              ],
+            ),
+          );
+        }).toList(),
+        onChanged: (value) {
+          if (value != null) {
+            setState(() => _selectedStatus = value);
+            _markDirty();
+          }
+        },
+      ),
+      const SizedBox(height: 24),
+    ];
+  }
+
+  List<Widget> _buildLocationSection() {
+    return [
+      const Divider(),
+      const SizedBox(height: 24),
+      _SectionLabel(label: 'Ubicación'),
+      const SizedBox(height: 12),
+      DropdownButtonFormField<int>(
+        value: _selectedProvinceId,
+        decoration: const InputDecoration(
+          labelText: 'Provincia *',
+          prefixIcon: Icon(Icons.map),
+        ),
+        items: ArgentinaProvinces.all.map((province) {
+          return DropdownMenuItem(
+            value: province.id,
+            child: Text(province.name),
+          );
+        }).toList(),
+        onChanged: (value) {
+          if (value != null) {
+            setState(() {
+              _selectedProvinceId = value;
+              // Clear city and lugar when province changes
+              _cityController.clear();
+              _lugarController.clear();
+              _selectedCityId = null;
+              _selectedLugarId = null;
+            });
+            _markDirty();
+          }
+        },
+      ),
+      const SizedBox(height: 12),
+      CityAutocomplete(
+        key: _cityAutocompleteKey,
+        controller: _cityController,
+        provinceId: _selectedProvinceId,
+        initialCityId: _selectedCityId,
+        onCitySelected: (city) {
+          setState(() {
+            _selectedCityId = city.id;
+            // Clear lugar when city changes
+            _lugarController.clear();
+            _selectedLugarId = null;
+          });
+        },
+        onCityTextChanged: (text) {
+          // If user types something different, clear the selection
+          if (_selectedCityId != null) {
+            final cityAutocomplete = _cityAutocompleteKey.currentState;
+            if (cityAutocomplete != null && !cityAutocomplete.hasMatchingCity) {
+              setState(() {
+                _selectedCityId = null;
+                _lugarController.clear();
+                _selectedLugarId = null;
+              });
+            }
+          } else {
+            // Rebuild so LugarAutocomplete gets the updated pendingCityText
+            setState(() {});
+          }
+        },
+        validator: (value) {
+          if (value == null || value.isEmpty) {
+            return 'Ingresá la ciudad';
+          }
+          return null;
+        },
+      ),
+      const SizedBox(height: 12),
+      LugarAutocomplete(
+        key: _lugarAutocompleteKey,
+        controller: _lugarController,
+        cityId: _selectedCityId,
+        initialLugarId: _selectedLugarId,
+        // Pass city text when creating new city (cityId is null but text is entered)
+        pendingCityText: _selectedCityId == null ? _cityController.text : null,
+        onLugarSelected: (lugar) {
+          setState(() {
+            _selectedLugarId = lugar.id;
+          });
+        },
+        onLugarTextChanged: (text) {
+          if (_selectedLugarId != null) {
+            final lugarAutocomplete = _lugarAutocompleteKey.currentState;
+            if (lugarAutocomplete != null && !lugarAutocomplete.hasMatchingLugar) {
+              setState(() {
+                _selectedLugarId = null;
+              });
+            }
+          }
+        },
+      ),
+      const SizedBox(height: 24),
+    ];
+  }
+
+  List<Widget> _buildResponsibleSection() {
+    return [
+      const Divider(),
+      const SizedBox(height: 24),
+      // Responsable
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          const _SectionLabel(label: 'Responsable'),
+          // El selector de contactos solo está disponible en móvil
+          if (!kIsWeb)
+            TextButton.icon(
+              onPressed: _pickContact,
+              icon: const Icon(Icons.contacts, size: 18),
+              label: const Text('Importar contacto'),
+            ),
+        ],
+      ),
+      const SizedBox(height: 12),
+      TextFormField(
+        controller: _responsibleNameController,
+        textCapitalization: TextCapitalization.words,
+        decoration: const InputDecoration(
+          labelText: 'Nombre *',
+          hintText: 'Nombre completo',
+          prefixIcon: Icon(Icons.person),
+        ),
+        validator: (value) {
+          if (value == null || value.isEmpty) {
+            return 'Ingresá el nombre del responsable';
+          }
+          return null;
+        },
+      ),
+      const SizedBox(height: 12),
+      TextFormField(
+        controller: _responsiblePhoneController,
+        keyboardType: TextInputType.phone,
+        decoration: const InputDecoration(
+          labelText: 'Teléfono *',
+          hintText: 'Ej: 1155667788',
+          prefixIcon: Icon(Icons.phone),
+        ),
+        validator: (value) {
+          if (value == null || value.isEmpty) {
+            return 'Ingresá el teléfono';
+          }
+          return null;
+        },
+      ),
+      const SizedBox(height: 24),
+    ];
+  }
+
+  List<Widget> _buildDocumentationSection() {
+    return [
+      const Divider(),
+      const SizedBox(height: 24),
+      // Documentación
+      _SectionLabel(label: 'Documentación'),
+      const SizedBox(height: 12),
+      _DatePickerField(
+        label: 'Vencimiento VTV',
+        value: _vtvExpiry,
+        onChanged: (date) {
+          setState(() => _vtvExpiry = date);
+          _markDirty();
+        },
+      ),
+      const SizedBox(height: 12),
+      TextFormField(
+        controller: _insuranceCompanyController,
+        textCapitalization: TextCapitalization.words,
+        decoration: const InputDecoration(
+          labelText: 'Compañía de Seguro',
+          hintText: 'Ej: La Segunda',
+          prefixIcon: Icon(Icons.security),
+        ),
+      ),
+      const SizedBox(height: 12),
+      _DatePickerField(
+        label: 'Vencimiento Seguro',
+        value: _insuranceExpiry,
+        onChanged: (date) {
+          setState(() => _insuranceExpiry = date);
+          _markDirty();
+        },
+      ),
+      const SizedBox(height: 32),
+    ];
+  }
+
+  Widget _buildSaveButton() {
+    return SizedBox(
+      height: 52,
+      child: ElevatedButton(
+        onPressed: _isLoading ? null : _saveVehicle,
+        child: _isLoading
+            ? const SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : Text(_isEditing ? 'Guardar Cambios' : 'Agregar Vehículo'),
       ),
     );
   }
@@ -655,9 +750,9 @@ class _VehicleFormScreenState extends ConsumerState<VehicleFormScreen> {
         type: _selectedType,
         brand: _brandController.text.trim(),
         model: _modelController.text.trim(),
-        year: int.parse(_yearController.text),
+        year: int.tryParse(_yearController.text) ?? DateTime.now().year,
         color: _selectedColor,
-        km: int.tryParse(_kmController.text) ?? 0,
+        km: int.tryParse(_kmController.text.replaceAll('.', '')) ?? 0,
         vtvExpiry: _vtvExpiry,
         insuranceCompany: _insuranceCompanyController.text.trim().isEmpty
             ? null
@@ -690,6 +785,7 @@ class _VehicleFormScreenState extends ConsumerState<VehicleFormScreen> {
 
       if (mounted) {
         if (success) {
+          _hasChanges = false;
           context.pop();
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
