@@ -111,6 +111,7 @@ class HomeScreen extends ConsumerWidget {
                               ),
                             IconButton(
                               onPressed: () => context.push('/search'),
+                              tooltip: 'Buscar',
                               icon: Container(
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(

@@ -102,6 +102,7 @@ class _DocumentPhotosSectionState extends ConsumerState<_DocumentPhotosSection> 
                       color: AppTheme.accentPrimary,
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(),
+                      tooltip: 'Agregar foto del documento',
                     ),
             ],
           ),

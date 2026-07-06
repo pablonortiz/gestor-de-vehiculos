@@ -176,12 +176,16 @@ class FuelChargeCard extends StatelessWidget {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     else
-                      GestureDetector(
-                        onTap: onDelete,
-                        child: Icon(
-                          Icons.delete_outline,
-                          size: 20,
-                          color: AppTheme.error.withValues(alpha: 0.7),
+                      Semantics(
+                        button: true,
+                        label: 'Eliminar carga',
+                        child: GestureDetector(
+                          onTap: onDelete,
+                          child: Icon(
+                            Icons.delete_outline,
+                            size: 20,
+                            color: AppTheme.error.withValues(alpha: 0.7),
+                          ),
                         ),
                       ),
                   ],

@@ -54,6 +54,7 @@ class _PhotosSectionState extends ConsumerState<_PhotosSection> {
                 : IconButton(
                     onPressed: _addPhoto,
                     icon: const Icon(Icons.add_a_photo, color: AppTheme.accentPrimary),
+                    tooltip: 'Agregar foto',
                   ),
           ],
         ),

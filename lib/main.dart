@@ -147,9 +147,12 @@ class _GestorVehiculosAppState extends ConsumerState<GestorVehiculosApp> {
       ],
       builder: (context, child) {
         return MediaQuery(
-          // Asegurar que el texto no se escale demasiado
+          // Respetar el tamaño de texto del sistema (accesibilidad) pero
+          // acotado para que un layout no explote con escalas extremas.
           data: MediaQuery.of(context).copyWith(
-            textScaler: TextScaler.noScaling,
+            textScaler: MediaQuery.of(context)
+                .textScaler
+                .clamp(minScaleFactor: 0.85, maxScaleFactor: 1.3),
           ),
           child: OfflineBanner(child: child!),
         );

@@ -31,6 +31,7 @@ class _NotesSectionState extends ConsumerState<_NotesSection> {
             IconButton(
               onPressed: () => _showNoteDialog(null),
               icon: const Icon(Icons.add, color: AppTheme.accentPrimary),
+              tooltip: 'Agregar nota',
             ),
           ],
         ),
@@ -573,6 +574,7 @@ class _NoteCard extends StatelessWidget {
                     : IconButton(
                         onPressed: onDelete,
                         icon: const Icon(Icons.delete_outline, color: AppTheme.error, size: 20),
+                        tooltip: 'Eliminar nota',
                       ),
               ],
             ),

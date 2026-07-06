@@ -35,6 +35,7 @@ class _MaintenancesSectionState extends ConsumerState<_MaintenancesSection> {
             IconButton(
               onPressed: () => _showMaintenanceDialog(null),
               icon: const Icon(Icons.add, color: AppTheme.accentPrimary),
+              tooltip: 'Agregar mantenimiento',
             ),
           ],
         ),
@@ -578,6 +579,7 @@ class _MaintenanceCard extends StatelessWidget {
                     : IconButton(
                         onPressed: onDelete,
                         icon: const Icon(Icons.delete_outline, color: AppTheme.error, size: 20),
+                        tooltip: 'Eliminar mantenimiento',
                       ),
               ],
             ),
