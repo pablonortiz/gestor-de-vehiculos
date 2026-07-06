@@ -72,8 +72,9 @@ class _VehicleFormScreenState extends ConsumerState<VehicleFormScreen> {
     _responsibleNameController = TextEditingController();
     _responsiblePhoneController = TextEditingController();
 
+    _captureTextBaseline();
     for (final c in _editableControllers) {
-      c.addListener(_markDirty);
+      c.addListener(_onTextChanged);
     }
     _plateController.addListener(() {
       setState(() {});
@@ -103,6 +104,27 @@ class _VehicleFormScreenState extends ConsumerState<VehicleFormScreen> {
   void _markDirty() {
     if (_settingUp) return;
     if (!_hasChanges) setState(() => _hasChanges = true);
+  }
+
+  // El autofocus/tap en un campo dispara notifyListeners del controller sin
+  // cambiar texto (setea selection). Para no marcar dirty por eso, los
+  // listeners de texto comparan contra un baseline en vez de confiar en la
+  // notificación.
+  late List<String> _textBaseline;
+
+  void _captureTextBaseline() {
+    _textBaseline =
+        _editableControllers.map((c) => c.text).toList(growable: false);
+  }
+
+  void _onTextChanged() {
+    if (_settingUp || _hasChanges) return;
+    for (var i = 0; i < _editableControllers.length; i++) {
+      if (_editableControllers[i].text != _textBaseline[i]) {
+        _markDirty();
+        return;
+      }
+    }
   }
 
   Future<bool> _confirmDiscard() async {
@@ -146,6 +168,7 @@ class _VehicleFormScreenState extends ConsumerState<VehicleFormScreen> {
         _vtvExpiry = vehicle.vtvExpiry;
         _insuranceExpiry = vehicle.insuranceExpiry;
       });
+      _captureTextBaseline();
     }
     _settingUp = false;
   }

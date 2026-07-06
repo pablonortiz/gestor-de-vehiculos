@@ -101,11 +101,17 @@ class _GestorVehiculosAppState extends ConsumerState<GestorVehiculosApp> {
     super.initState();
     // Sincronizar datos y suscribirse a cambios en tiempo real
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      // Recordatorios de vencimiento (VTV/seguro): pedir permiso y reprogramar
-      // con los vehículos en cache (un reinicio del teléfono borra lo agendado).
-      await NotificationService.instance.requestPermission();
+      // Recordatorios de vencimiento (VTV/seguro): reprogramar con los
+      // vehículos en cache (un reinicio del teléfono borra lo agendado).
+      // El permiso se pide recién cuando hay vencimientos que recordar, no
+      // en frío en el primer arranque.
       try {
         final vehicles = await ref.read(vehiclesProvider.future);
+        final hasExpiries = vehicles.any(
+            (v) => v.vtvExpiry != null || v.insuranceExpiry != null);
+        if (hasExpiries) {
+          await NotificationService.instance.requestPermission();
+        }
         await NotificationService.instance.syncAll(vehicles);
       } catch (_) {
         // Sin vehículos cargados todavía; se reprograma al crear/editar.

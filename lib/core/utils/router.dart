@@ -140,12 +140,18 @@ class MainShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // En Ajustes un "+" de alta de vehículo no tiene sentido.
+    final onSettings =
+        GoRouterState.of(context).uri.toString().startsWith('/settings');
+
     return Scaffold(
       body: child,
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => context.push('/vehicle/new'),
-        child: const Icon(Icons.add),
-      ),
+      floatingActionButton: onSettings
+          ? null
+          : FloatingActionButton(
+              onPressed: () => context.push('/vehicle/new'),
+              child: const Icon(Icons.add),
+            ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _calculateSelectedIndex(context),
         onDestinationSelected: (index) => _onItemTapped(index, context),

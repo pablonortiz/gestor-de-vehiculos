@@ -18,6 +18,8 @@ void showCitiesInProvinceSheet(
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
+    // Sobre el navigator raíz para tapar el FAB del shell.
+    useRootNavigator: true,
     builder: (sheetContext) => SafeArea(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -180,6 +182,8 @@ void showExpiringVehiclesSheet(BuildContext context, WidgetRef ref) {
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
+    // Sobre el navigator raíz para tapar el FAB del shell.
+    useRootNavigator: true,
     builder: (context) => SafeArea(
       child: Column(
         mainAxisSize: MainAxisSize.min,

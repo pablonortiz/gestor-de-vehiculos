@@ -52,7 +52,7 @@ class _HierarchicalFilterSheetState extends ConsumerState<HierarchicalFilterShee
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text(
-                      'Filtrar por ubicacion',
+                      'Filtrar por ubicación',
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
@@ -473,6 +473,9 @@ Future<void> showHierarchicalFilterSheet(BuildContext context) {
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
+    // Sobre el navigator raíz: si no, el FAB del shell queda flotando
+    // por encima del sheet.
+    useRootNavigator: true,
     builder: (context) => const HierarchicalFilterSheet(),
   );
 }
