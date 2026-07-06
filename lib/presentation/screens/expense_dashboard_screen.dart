@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/formatters.dart';
 import '../../domain/expense_summary.dart';
 import '../providers/expense_provider.dart';
 import '../widgets/error_retry_view.dart';
@@ -48,6 +49,10 @@ class ExpenseDashboardScreen extends ConsumerWidget {
               padding: const EdgeInsets.all(16),
               children: [
                 _TotalCard(dashboard: dashboard),
+                if (dashboard.uncostedMaintenances > 0) ...[
+                  const SizedBox(height: 12),
+                  _UncostedNotice(count: dashboard.uncostedMaintenances),
+                ],
                 const SizedBox(height: 24),
                 _MonthlyChart(byMonth: dashboard.byMonth),
                 const SizedBox(height: 24),
@@ -61,7 +66,38 @@ class ExpenseDashboardScreen extends ConsumerWidget {
   }
 }
 
-final _currency = NumberFormat.currency(locale: 'es_AR', symbol: '\$', decimalDigits: 0);
+/// Aviso de que hay mantenimientos sin costo cargado (totales incompletos).
+class _UncostedNotice extends StatelessWidget {
+  final int count;
+
+  const _UncostedNotice({required this.count});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppTheme.warning.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.warning.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.info_outline, size: 16, color: AppTheme.warning),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              count == 1
+                  ? '1 mantenimiento del período no tiene costo cargado'
+                  : '$count mantenimientos del período no tienen costo cargado',
+              style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class _TotalCard extends StatelessWidget {
   final ExpenseDashboard dashboard;
@@ -91,7 +127,7 @@ class _TotalCard extends StatelessWidget {
               style: TextStyle(fontSize: 13, color: AppTheme.textSecondary)),
           const SizedBox(height: 4),
           Text(
-            _currency.format(dashboard.grandTotal),
+            AppFormats.money(dashboard.grandTotal),
             style: const TextStyle(
               fontSize: 28,
               fontWeight: FontWeight.bold,
@@ -121,7 +157,7 @@ class _TotalCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(label, style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
-            Text(_currency.format(value),
+            Text(AppFormats.money(value),
                 style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
           ],
         ),
@@ -165,7 +201,7 @@ class _MonthlyChart extends StatelessWidget {
                   touchTooltipData: BarTouchTooltipData(
                     getTooltipColor: (_) => AppTheme.surfaceLight,
                     getTooltipItem: (group, gi, rod, ri) => BarTooltipItem(
-                      _currency.format(rod.toY),
+                      AppFormats.money(rod.toY),
                       const TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.w600),
                     ),
                   ),
@@ -240,37 +276,45 @@ class _VehicleRanking extends StatelessWidget {
         const Text('Por vehículo',
             style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
         const SizedBox(height: 12),
-        ...byVehicle.map((e) => Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppTheme.surface,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppTheme.border),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(e.label,
-                            style: const TextStyle(
-                                fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
-                        const SizedBox(height: 2),
-                        Text(
-                          '${_currency.format(e.fuelTotal)} comb. · ${_currency.format(e.maintenanceTotal)} mant.',
-                          style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
-                        ),
-                      ],
+        ...byVehicle.map((e) => GestureDetector(
+              onTap: e.vehicleId.isEmpty
+                  ? null
+                  : () => context.push('/vehicle/${e.vehicleId}'),
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppTheme.surface,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppTheme.border),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(e.label,
+                              style: const TextStyle(
+                                  fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
+                          const SizedBox(height: 2),
+                          Text(
+                            '${AppFormats.money(e.fuelTotal)} comb. · ${AppFormats.money(e.maintenanceTotal)} mant.',
+                            style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  Text(
-                    _currency.format(e.total),
-                    style: const TextStyle(
-                        fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.accentPrimary),
-                  ),
-                ],
+                    Text(
+                      AppFormats.money(e.total),
+                      style: const TextStyle(
+                          fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.accentPrimary),
+                    ),
+                    const SizedBox(width: 4),
+                    const Icon(Icons.chevron_right,
+                        size: 18, color: AppTheme.textSecondary),
+                  ],
+                ),
               ),
             )),
       ],
