@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import '../../core/constants/provinces.dart';
 import '../../core/theme/app_theme.dart';
 import '../../domain/models/city.dart';
+import '../../domain/models/vehicle.dart';
 import '../providers/vehicle_provider.dart';
 import '../providers/location_provider.dart';
 
@@ -125,9 +127,32 @@ Widget _buildCityList(
   );
 }
 
+/// "VTV: venció 24/06/2026 (hace 12 días)" / "Seguro: vence 27/07/2026 (en 21 días)".
+String _expiryLine(ExpiringDocument doc) {
+  final date = DateFormat('dd/MM/yyyy').format(doc.expiry);
+  if (doc.expired) {
+    final days = -doc.daysLeft;
+    final ago = days == 0 ? 'hoy' : 'hace $days ${days == 1 ? 'día' : 'días'}';
+    return '${doc.label}: venció $date ($ago)';
+  }
+  final left = doc.daysLeft == 0
+      ? 'hoy'
+      : 'en ${doc.daysLeft} ${doc.daysLeft == 1 ? 'día' : 'días'}';
+  return '${doc.label}: vence $date ($left)';
+}
+
 /// Bottom-sheet con los vehículos cuya documentación está próxima a vencer.
 void showExpiringVehiclesSheet(BuildContext context, WidgetRef ref) {
-  final vehicles = ref.read(expiringDocumentsProvider).valueOrNull;
+  final loaded = ref.read(expiringDocumentsProvider).valueOrNull;
+  // Más urgente primero (el doc que vence antes manda).
+  final vehicles = loaded == null
+      ? null
+      : (loaded.toList()
+        ..sort((a, b) {
+          final aExpiry = a.expiringDocuments.firstOrNull?.expiry ?? DateTime(9999);
+          final bExpiry = b.expiringDocuments.firstOrNull?.expiry ?? DateTime(9999);
+          return aExpiry.compareTo(bExpiry);
+        }));
 
   // Si el provider aún no resolvió (loading) o quedó en error, dar feedback
   // en vez de un tap que no hace nada.
@@ -183,21 +208,33 @@ void showExpiringVehiclesSheet(BuildContext context, WidgetRef ref) {
               itemCount: vehicles.length,
               itemBuilder: (context, index) {
                 final vehicle = vehicles[index];
+                final hasExpired =
+                    vehicle.isVtvExpired || vehicle.isInsuranceExpired;
                 return ListTile(
                   leading: Icon(
-                    vehicle.isVtvExpired || vehicle.isInsuranceExpired
-                        ? Icons.error
-                        : Icons.warning_amber_rounded,
-                    color: vehicle.isVtvExpired || vehicle.isInsuranceExpired
-                        ? AppTheme.error
-                        : AppTheme.warning,
+                    hasExpired ? Icons.error : Icons.warning_amber_rounded,
+                    color: hasExpired ? AppTheme.error : AppTheme.warning,
                   ),
                   title: Text('${vehicle.brand} ${vehicle.model}'),
-                  subtitle: Text(vehicle.plate),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(vehicle.plate),
+                      for (final doc in vehicle.expiringDocuments)
+                        Text(
+                          _expiryLine(doc),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: doc.expired ? AppTheme.error : AppTheme.warning,
+                          ),
+                        ),
+                    ],
+                  ),
+                  isThreeLine: vehicle.expiringDocuments.length > 1,
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () {
                     Navigator.pop(context);
-                    context.push('/vehicle/${vehicle.id}');
+                    context.push('/vehicle/${vehicle.id}?highlight=docs');
                   },
                 );
               },

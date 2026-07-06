@@ -59,7 +59,10 @@ final router = GoRouter(
       parentNavigatorKey: _rootNavigatorKey,
       builder: (context, state) {
         final id = state.pathParameters['id']!;
-        return VehicleDetailScreen(vehicleId: id);
+        return VehicleDetailScreen(
+          vehicleId: id,
+          highlightDocs: state.uri.queryParameters['highlight'] == 'docs',
+        );
       },
     ),
     GoRoute(

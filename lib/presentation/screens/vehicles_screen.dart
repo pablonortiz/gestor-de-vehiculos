@@ -344,12 +344,30 @@ class _VehicleCard extends StatelessWidget {
                         ),
                       ),
                       if (hasWarning)
-                        Icon(
-                          Icons.warning_amber_rounded,
-                          size: 18,
-                          color: vehicle.isVtvExpired || vehicle.isInsuranceExpired
-                              ? AppTheme.error
-                              : AppTheme.warning,
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.warning_amber_rounded,
+                              size: 18,
+                              color: vehicle.isVtvExpired || vehicle.isInsuranceExpired
+                                  ? AppTheme.error
+                                  : AppTheme.warning,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              vehicle.expiringDocuments
+                                  .map((d) => d.label)
+                                  .join(' · '),
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: vehicle.isVtvExpired || vehicle.isInsuranceExpired
+                                    ? AppTheme.error
+                                    : AppTheme.warning,
+                              ),
+                            ),
+                          ],
                         ),
                     ],
                   ),

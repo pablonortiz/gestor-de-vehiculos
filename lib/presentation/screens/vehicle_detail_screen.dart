@@ -38,13 +38,50 @@ part 'vehicle_detail/detail_widgets.dart';
 part 'vehicle_detail/pdf_preview.dart';
 part 'vehicle_detail/pdf_export.dart';
 
-class VehicleDetailScreen extends ConsumerWidget {
+class VehicleDetailScreen extends ConsumerStatefulWidget {
   final String vehicleId;
+  final bool highlightDocs;
 
-  const VehicleDetailScreen({super.key, required this.vehicleId});
+  const VehicleDetailScreen({
+    super.key,
+    required this.vehicleId,
+    this.highlightDocs = false,
+  });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<VehicleDetailScreen> createState() =>
+      _VehicleDetailScreenState();
+}
+
+class _VehicleDetailScreenState extends ConsumerState<VehicleDetailScreen> {
+  final _docsSectionKey = GlobalKey();
+  late bool _docsScrollPending = widget.highlightDocs;
+
+  String get vehicleId => widget.vehicleId;
+
+  /// Al entrar desde "Documentos por Vencer", lleva la vista a Documentación.
+  /// Dos pasadas: las secciones async (fotos, adjuntos) cargan después del
+  /// primer frame y corren el layout, así que la segunda corrige el desvío.
+  void _scheduleDocsScroll() {
+    if (!_docsScrollPending) return;
+    _docsScrollPending = false;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      for (final delay in const [100, 700]) {
+        await Future.delayed(Duration(milliseconds: delay));
+        if (!mounted) return;
+        final docsContext = _docsSectionKey.currentContext;
+        if (docsContext == null) continue;
+        await Scrollable.ensureVisible(
+          docsContext,
+          duration: const Duration(milliseconds: 300),
+          alignment: 0.05,
+        );
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     // El refresco post-sync de fotos/documentos/mantenimientos/notas/combustible
     // ya ocurre solo: replaceAllData emite notifyChange de esas tablas y cada
     // provider watchea su *ChangeProvider. No hace falta invalidar manualmente.
@@ -62,6 +99,8 @@ class VehicleDetailScreen extends ConsumerWidget {
           if (vehicle == null) {
             return const Center(child: Text('Vehículo no encontrado'));
           }
+
+          _scheduleDocsScroll();
 
           final province = ArgentinaProvinces.getById(vehicle.provinceId);
           final dateFormat = DateFormat('dd/MM/yyyy');
@@ -384,7 +423,10 @@ class VehicleDetailScreen extends ConsumerWidget {
                       const SizedBox(height: 24),
 
                       // Documentación
-                      _SectionTitle(title: 'Documentación'),
+                      KeyedSubtree(
+                        key: _docsSectionKey,
+                        child: _SectionTitle(title: 'Documentación'),
+                      ),
                       const SizedBox(height: 12),
                       _InfoCard(
                         children: [
