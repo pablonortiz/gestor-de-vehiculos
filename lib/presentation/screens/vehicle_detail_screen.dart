@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../core/config/supabase_config.dart';
 import '../../core/constants/provinces.dart';
 import '../../core/constants/vehicle_constants.dart';
 import '../../core/theme/app_theme.dart';
@@ -19,6 +20,7 @@ import '../../domain/models/document_photo.dart';
 import '../../domain/models/fuel_charge.dart';
 import '../../data/repositories/document_photo_repository.dart';
 import '../../data/services/cloudinary_service.dart';
+import '../../data/services/sync_service.dart';
 import 'package:printing/printing.dart';
 import '../../data/services/pdf_service.dart';
 import '../providers/vehicle_provider.dart';
@@ -106,7 +108,19 @@ class _VehicleDetailScreenState extends ConsumerState<VehicleDetailScreen> {
           final province = ArgentinaProvinces.getById(vehicle.provinceId);
           final dateFormat = DateFormat('dd/MM/yyyy');
 
-          return CustomScrollView(
+          return RefreshIndicator(
+            onRefresh: () async {
+              if (SupabaseConfig.isConfigured) {
+                await ref.read(syncServiceProvider.notifier).fullSync();
+              }
+              ref.invalidate(vehicleByIdProvider(vehicleId));
+              ref.invalidate(maintenancesByVehicleProvider(vehicleId));
+              ref.invalidate(notesByVehicleProvider(vehicleId));
+              ref.invalidate(photosByVehicleProvider(vehicleId));
+              ref.invalidate(documentPhotosByVehicleProvider(vehicleId));
+              ref.invalidate(recentFuelChargesProvider(vehicleId));
+            },
+            child: CustomScrollView(
             slivers: [
               // App Bar con icono sticky
               SliverAppBar(
@@ -547,6 +561,7 @@ class _VehicleDetailScreenState extends ConsumerState<VehicleDetailScreen> {
                 ),
               ),
             ],
+            ),
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
