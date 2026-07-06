@@ -188,38 +188,57 @@ class HomeScreen extends ConsumerWidget {
               ),
             ),
 
-            // Grid de provincias
+            // Grid de provincias (solo las que tienen vehículos)
             vehicleCountAsync.when(
-              data: (countMap) => SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                sliver: SliverGrid(
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    mainAxisSpacing: 12,
-                    crossAxisSpacing: 12,
-                    childAspectRatio: 1.6,
+              data: (countMap) {
+                final provinces = ArgentinaProvinces.all
+                    .where((p) => (countMap[p.id] ?? 0) > 0)
+                    .toList();
+
+                if (provinces.isEmpty) {
+                  return const SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.all(40),
+                      child: Center(
+                        child: Text(
+                          'Sin vehículos cargados todavía',
+                          style: TextStyle(color: AppTheme.textSecondary),
+                        ),
+                      ),
+                    ),
+                  );
+                }
+
+                return SliverPadding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  sliver: SliverGrid(
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      mainAxisSpacing: 12,
+                      crossAxisSpacing: 12,
+                      childAspectRatio: 1.6,
+                    ),
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                        final province = provinces[index];
+
+                        return _ProvinceCard(
+                          province: province,
+                          vehicleCount: countMap[province.id] ?? 0,
+                          onTap: () {
+                            ref.read(locationFilterProvider.notifier).setProvince(province.id);
+                            context.go('/vehicles');
+                          },
+                          onLongPress: () {
+                            showCitiesInProvinceSheet(context, ref, province);
+                          },
+                        );
+                      },
+                      childCount: provinces.length,
+                    ),
                   ),
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) {
-                      final province = ArgentinaProvinces.all[index];
-                      final count = countMap[province.id] ?? 0;
-                      
-                      return _ProvinceCard(
-                        province: province,
-                        vehicleCount: count,
-                        onTap: () {
-                          ref.read(locationFilterProvider.notifier).setProvince(province.id);
-                          context.go('/vehicles');
-                        },
-                        onLongPress: () {
-                          showCitiesInProvinceSheet(context, ref, province);
-                        },
-                      );
-                    },
-                    childCount: ArgentinaProvinces.all.length,
-                  ),
-                ),
-              ),
+                );
+              },
               loading: () => const SliverToBoxAdapter(
                 child: Center(
                   child: Padding(
