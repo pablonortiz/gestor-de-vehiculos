@@ -10,6 +10,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../core/constants/provinces.dart';
 import '../../core/constants/vehicle_constants.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/formatters.dart';
 import '../../domain/models/maintenance.dart';
 import '../../domain/models/vehicle.dart';
 import '../../domain/models/vehicle_note.dart';

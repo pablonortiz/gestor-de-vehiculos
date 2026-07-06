@@ -20,6 +20,10 @@ class _MaintenancesSectionState extends ConsumerState<_MaintenancesSection> {
   @override
   Widget build(BuildContext context) {
     final dateFormat = DateFormat('dd/MM/yyyy');
+    final totalCost = widget.maintenances
+        .fold<double>(0, (sum, m) => sum + (m.cost ?? 0));
+    final withoutCost =
+        widget.maintenances.where((m) => (m.cost ?? 0) == 0).length;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -34,6 +38,19 @@ class _MaintenancesSectionState extends ConsumerState<_MaintenancesSection> {
             ),
           ],
         ),
+        if (totalCost > 0)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Text(
+              withoutCost > 0
+                  ? 'Total: ${AppFormats.money(totalCost)} · $withoutCost sin costo cargado'
+                  : 'Total: ${AppFormats.money(totalCost)}',
+              style: const TextStyle(
+                fontSize: 13,
+                color: AppTheme.textSecondary,
+              ),
+            ),
+          ),
         const SizedBox(height: 12),
         if (widget.maintenances.isEmpty)
           Container(
@@ -540,6 +557,18 @@ class _MaintenanceCard extends StatelessWidget {
                     ],
                   ),
                 ),
+                if (maintenance.cost != null && maintenance.cost! > 0)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 4),
+                    child: Text(
+                      AppFormats.money(maintenance.cost!),
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.accentPrimary,
+                      ),
+                    ),
+                  ),
                 isDeleting
                     ? const SizedBox(
                         width: 24,
