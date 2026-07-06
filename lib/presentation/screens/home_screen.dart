@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../widgets/error_retry_view.dart';
+import '../widgets/empty_state.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/config/supabase_config.dart';
@@ -19,6 +20,7 @@ class HomeScreen extends ConsumerWidget {
     final totalCountAsync = ref.watch(totalVehicleCountProvider);
     final expiringAsync = ref.watch(expiringDocumentsProvider);
     final syncState = ref.watch(syncServiceProvider);
+    final hasNoVehicles = totalCountAsync.valueOrNull == 0;
 
     // El refresco post-sync ya ocurre solo vía DbChangeService.notifyChange →
     // los counts/total/expiring watchean vehiclesChangeProvider. Sin invalidación manual.
@@ -131,66 +133,84 @@ class HomeScreen extends ConsumerWidget {
                     ),
                     const SizedBox(height: 24),
 
-                    // Estadísticas rápidas
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _StatCard(
-                            title: 'Total Vehículos',
-                            value: totalCountAsync.when(
-                              data: (count) => count.toString(),
-                              loading: () => '...',
-                              error: (_, _) => '0',
+                    // Sin vehículos: bienvenida guiada en vez de stats en 0
+                    if (!hasNoVehicles) ...[
+                      // Estadísticas rápidas
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _StatCard(
+                              title: 'Total Vehículos',
+                              value: totalCountAsync.when(
+                                data: (count) => count.toString(),
+                                loading: () => '...',
+                                error: (_, _) => '0',
+                              ),
+                              icon: Icons.directions_car,
+                              color: AppTheme.accentPrimary,
                             ),
-                            icon: Icons.directions_car,
-                            color: AppTheme.accentPrimary,
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _StatCard(
-                            title: 'Por Vencer',
-                            value: expiringAsync.when(
-                              data: (list) => list.length.toString(),
-                              loading: () => '...',
-                              error: (_, _) => '0',
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _StatCard(
+                              title: 'Por Vencer',
+                              value: expiringAsync.when(
+                                data: (list) => list.length.toString(),
+                                loading: () => '...',
+                                error: (_, _) => '0',
+                              ),
+                              icon: Icons.warning_amber_rounded,
+                              color: AppTheme.warning,
+                              onTap: () {
+                                showExpiringVehiclesSheet(context, ref);
+                              },
                             ),
-                            icon: Icons.warning_amber_rounded,
-                            color: AppTheme.warning,
-                            onTap: () {
-                              showExpiringVehiclesSheet(context, ref);
-                            },
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 28),
+                        ],
+                      ),
+                      const SizedBox(height: 28),
 
-                    // Título sección provincias
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Por Provincia',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w600,
-                            color: AppTheme.textPrimary,
+                      // Título sección provincias
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Por Provincia',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w600,
+                              color: AppTheme.textPrimary,
+                            ),
                           ),
-                        ),
-                        TextButton(
-                          onPressed: () => context.go('/vehicles'),
-                          child: const Text('Ver todos'),
-                        ),
-                      ],
-                    ),
+                          TextButton(
+                            onPressed: () => context.go('/vehicles'),
+                            child: const Text('Ver todos'),
+                          ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
               ),
             ),
 
+            if (hasNoVehicles)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
+                  child: EmptyState(
+                    icon: Icons.directions_car_outlined,
+                    message:
+                        'Todavía no cargaste ningún vehículo.\nEmpezá agregando el primero.',
+                    actionLabel: 'Agregar vehículo',
+                    onAction: () => context.push('/vehicle/new'),
+                  ),
+                ),
+              ),
+
             // Grid de provincias (solo las que tienen vehículos)
-            vehicleCountAsync.when(
+            if (!hasNoVehicles)
+              vehicleCountAsync.when(
               data: (countMap) {
                 final provinces = ArgentinaProvinces.all
                     .where((p) => (countMap[p.id] ?? 0) > 0)
