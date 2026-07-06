@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/formatters.dart';
 import '../../domain/models/fuel_charge.dart';
 
 /// Resumen mensual de combustible. Dos variantes:
@@ -18,12 +18,6 @@ class FuelSummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final currencyFormat = NumberFormat.currency(
-      locale: 'es_AR',
-      symbol: '\$',
-      decimalDigits: 0,
-    );
-
     return Container(
       margin: compact ? EdgeInsets.zero : const EdgeInsets.all(16),
       padding: const EdgeInsets.all(16),
@@ -43,9 +37,7 @@ class FuelSummaryCard extends StatelessWidget {
       ),
       child: summary.chargeCount == 0
           ? _buildEmptyState()
-          : (compact
-              ? _buildCompactContent(currencyFormat)
-              : _buildFullContent(currencyFormat)),
+          : (compact ? _buildCompactContent() : _buildFullContent()),
     );
   }
 
@@ -64,14 +56,14 @@ class FuelSummaryCard extends StatelessWidget {
     );
   }
 
-  Widget _buildFullContent(NumberFormat currencyFormat) {
+  Widget _buildFullContent() {
     return Row(
       children: [
         Expanded(
           child: _SummaryItem(
             icon: Icons.local_gas_station,
             label: 'Total',
-            value: '${summary.totalLiters.toStringAsFixed(1)} L',
+            value: AppFormats.liters(summary.totalLiters),
           ),
         ),
         _divider(40),
@@ -79,7 +71,7 @@ class FuelSummaryCard extends StatelessWidget {
           child: _SummaryItem(
             icon: Icons.attach_money,
             label: 'Gastado',
-            value: currencyFormat.format(summary.totalPrice),
+            value: AppFormats.money(summary.totalPrice),
           ),
         ),
         _divider(40),
@@ -87,7 +79,7 @@ class FuelSummaryCard extends StatelessWidget {
           child: _SummaryItem(
             icon: Icons.trending_up,
             label: 'Promedio',
-            value: '${currencyFormat.format(summary.averagePricePerLiter)}/L',
+            value: '${AppFormats.money(summary.averagePricePerLiter)}/L',
           ),
         ),
         _divider(40),
@@ -102,28 +94,28 @@ class FuelSummaryCard extends StatelessWidget {
     );
   }
 
-  Widget _buildCompactContent(NumberFormat currencyFormat) {
+  Widget _buildCompactContent() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceAround,
       children: [
         _SummaryItem(
           icon: Icons.local_gas_station,
           label: 'Este mes',
-          value: '${summary.totalLiters.toStringAsFixed(1)} L',
+          value: AppFormats.liters(summary.totalLiters),
           compact: true,
         ),
         _divider(30),
         _SummaryItem(
           icon: Icons.attach_money,
           label: 'Gastado',
-          value: currencyFormat.format(summary.totalPrice),
+          value: AppFormats.money(summary.totalPrice),
           compact: true,
         ),
         _divider(30),
         _SummaryItem(
           icon: Icons.trending_up,
           label: 'Promedio',
-          value: '${currencyFormat.format(summary.averagePricePerLiter)}/L',
+          value: '${AppFormats.money(summary.averagePricePerLiter)}/L',
           compact: true,
         ),
       ],

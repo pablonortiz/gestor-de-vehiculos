@@ -71,7 +71,7 @@ class _VehicleDetailScreenState extends ConsumerState<VehicleDetailScreen> {
         await Future.delayed(Duration(milliseconds: delay));
         if (!mounted) return;
         final docsContext = _docsSectionKey.currentContext;
-        if (docsContext == null) continue;
+        if (docsContext == null || !docsContext.mounted) continue;
         await Scrollable.ensureVisible(
           docsContext,
           duration: const Duration(milliseconds: 300),
@@ -407,7 +407,7 @@ class _VehicleDetailScreenState extends ConsumerState<VehicleDetailScreen> {
                           _InfoRow(
                             icon: Icons.speed,
                             label: 'Kilometraje',
-                            value: '${NumberFormat('#,###').format(vehicle.km)} km',
+                            value: AppFormats.km(vehicle.km),
                           ),
                           _InfoRow(
                             icon: vehicle.fuelType.icon,

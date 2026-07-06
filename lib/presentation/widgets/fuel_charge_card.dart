@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/formatters.dart';
 import '../../domain/models/fuel_charge.dart';
 
 class FuelChargeCard extends StatelessWidget {
@@ -21,11 +22,6 @@ class FuelChargeCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dateFormat = DateFormat('dd MMM', 'es');
-    final currencyFormat = NumberFormat.currency(
-      locale: 'es_AR',
-      symbol: '\$',
-      decimalDigits: 0,
-    );
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -87,7 +83,7 @@ class FuelChargeCard extends StatelessWidget {
                           ),
                           const SizedBox(width: 4),
                           Text(
-                            '${fuelCharge.liters.toStringAsFixed(1)} L',
+                            AppFormats.liters(fuelCharge.liters),
                             style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
@@ -96,7 +92,7 @@ class FuelChargeCard extends StatelessWidget {
                           ),
                           const Spacer(),
                           Text(
-                            currencyFormat.format(fuelCharge.price),
+                            AppFormats.money(fuelCharge.price),
                             style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w700,
@@ -109,7 +105,7 @@ class FuelChargeCard extends StatelessWidget {
                       Row(
                         children: [
                           Text(
-                            '\$${fuelCharge.calculatedPricePerLiter.toStringAsFixed(0)}/L',
+                            '${AppFormats.money(fuelCharge.calculatedPricePerLiter)}/L',
                             style: const TextStyle(
                               fontSize: 12,
                               color: AppTheme.textSecondary,
@@ -124,7 +120,7 @@ class FuelChargeCard extends StatelessWidget {
                             ),
                             const SizedBox(width: 2),
                             Text(
-                              '${NumberFormat('#,###').format(fuelCharge.odometer)} km',
+                              AppFormats.km(fuelCharge.odometer!),
                               style: const TextStyle(
                                 fontSize: 12,
                                 color: AppTheme.textSecondary,
