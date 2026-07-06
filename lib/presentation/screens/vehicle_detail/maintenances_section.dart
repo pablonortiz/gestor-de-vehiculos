@@ -54,19 +54,11 @@ class _MaintenancesSectionState extends ConsumerState<_MaintenancesSection> {
           ),
         const SizedBox(height: 12),
         if (widget.maintenances.isEmpty)
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppTheme.surface,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppTheme.border),
-            ),
-            child: const Center(
-              child: Text(
-                'Sin mantenimientos registrados',
-                style: TextStyle(color: AppTheme.textSecondary),
-              ),
-            ),
+          EmptyState(
+            icon: Icons.build_outlined,
+            message: 'Sin mantenimientos registrados',
+            actionLabel: 'Agregar mantenimiento',
+            onAction: () => _showMaintenanceDialog(null),
           )
         else
           ...widget.maintenances.map((m) => _MaintenanceCard(

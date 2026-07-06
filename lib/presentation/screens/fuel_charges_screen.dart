@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
 import '../widgets/error_retry_view.dart';
+import '../widgets/empty_state.dart';
 import '../../domain/models/fuel_charge.dart';
 import '../providers/fuel_charge_provider.dart';
 import '../widgets/month_navigator.dart';
@@ -150,22 +151,11 @@ class _FuelChargesScreenState extends ConsumerState<FuelChargesScreen> {
                         if (charges.isEmpty) {
                           return Padding(
                             padding: const EdgeInsets.all(32),
-                            child: Column(
-                              children: [
-                                Icon(
-                                  Icons.local_gas_station_outlined,
-                                  size: 64,
-                                  color: AppTheme.textSecondary.withValues(alpha: 0.5),
-                                ),
-                                const SizedBox(height: 16),
-                                const Text(
-                                  'No hay cargas este mes',
-                                  style: TextStyle(
-                                    color: AppTheme.textSecondary,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                              ],
+                            child: EmptyState(
+                              icon: Icons.local_gas_station_outlined,
+                              message: 'No hay cargas este mes',
+                              actionLabel: 'Agregar carga',
+                              onAction: () => _showFuelChargeForm(null),
                             ),
                           );
                         }

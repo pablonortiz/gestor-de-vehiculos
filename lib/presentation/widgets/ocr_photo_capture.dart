@@ -381,7 +381,7 @@ class _OcrPhotoCaptureState extends State<OcrPhotoCapture> {
       _safeSetState(() => _isProcessing = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
+          const SnackBar(content: Text('No se pudo subir el archivo')),
         );
       }
     }
@@ -451,7 +451,7 @@ class _OcrPhotoCaptureState extends State<OcrPhotoCapture> {
       _safeSetState(() => _isProcessing = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
+          const SnackBar(content: Text('No se pudo subir el archivo')),
         );
       }
     }

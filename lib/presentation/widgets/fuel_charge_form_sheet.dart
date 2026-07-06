@@ -429,7 +429,7 @@ class _FuelChargeFormSheetState extends ConsumerState<FuelChargeFormSheet> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
+          const SnackBar(content: Text('No se pudo guardar la carga')),
         );
       }
     } finally {

@@ -238,7 +238,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: $e'),
+            content: Text('No se pudo sincronizar. Probá de nuevo.'),
             backgroundColor: AppTheme.error,
           ),
         );

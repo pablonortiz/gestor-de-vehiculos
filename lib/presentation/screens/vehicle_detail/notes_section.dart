@@ -37,19 +37,11 @@ class _NotesSectionState extends ConsumerState<_NotesSection> {
         ),
         const SizedBox(height: 12),
         if (widget.notes.isEmpty)
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppTheme.surface,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppTheme.border),
-            ),
-            child: const Center(
-              child: Text(
-                'Sin notas',
-                style: TextStyle(color: AppTheme.textSecondary),
-              ),
-            ),
+          EmptyState(
+            icon: Icons.note_outlined,
+            message: 'Sin notas',
+            actionLabel: 'Agregar nota',
+            onAction: () => _showNoteDialog(null),
           )
         else
           ...widget.notes.map((n) => _NoteCard(
@@ -493,7 +485,9 @@ class _NoteFormSheetState extends ConsumerState<_NoteFormSheet> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: AppTheme.error),
+          const SnackBar(
+              content: Text('No se pudo guardar la nota'),
+              backgroundColor: AppTheme.error),
         );
       }
     } finally {

@@ -31,6 +31,7 @@ import '../../core/utils/contact_launcher.dart';
 import '../../core/utils/confirm_dialog.dart';
 import '../../core/utils/thousands_formatter.dart';
 import '../widgets/error_retry_view.dart';
+import '../widgets/empty_state.dart';
 
 part 'vehicle_detail/photos_section.dart';
 part 'vehicle_detail/document_photos_section.dart';
@@ -516,8 +517,15 @@ class _VehicleDetailScreenState extends ConsumerState<VehicleDetailScreen> {
                           maintenances: maintenances,
                           vehicleId: vehicleId,
                         ),
-                        loading: () => const Center(child: CircularProgressIndicator()),
-                        error: (e, _) => Text('Error: $e'),
+                        loading: () => const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 24),
+                          child: Center(child: CircularProgressIndicator()),
+                        ),
+                        error: (e, _) => ErrorRetryView(
+                          message: 'No se pudieron cargar los mantenimientos',
+                          onRetry: () => ref.invalidate(
+                              maintenancesByVehicleProvider(vehicleId)),
+                        ),
                       ),
                       const SizedBox(height: 24),
 
@@ -538,8 +546,15 @@ class _VehicleDetailScreenState extends ConsumerState<VehicleDetailScreen> {
                           notes: notes,
                           vehicleId: vehicleId,
                         ),
-                        loading: () => const Center(child: CircularProgressIndicator()),
-                        error: (e, _) => Text('Error: $e'),
+                        loading: () => const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 24),
+                          child: Center(child: CircularProgressIndicator()),
+                        ),
+                        error: (e, _) => ErrorRetryView(
+                          message: 'No se pudieron cargar las notas',
+                          onRetry: () =>
+                              ref.invalidate(notesByVehicleProvider(vehicleId)),
+                        ),
                       ),
 
                       const SizedBox(height: 32),
@@ -639,7 +654,7 @@ class _VehicleDetailScreenState extends ConsumerState<VehicleDetailScreen> {
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text('Error: $e'),
+                              content: Text('No se pudo eliminar el vehículo'),
                               backgroundColor: AppTheme.error,
                             ),
                           );
