@@ -27,6 +27,36 @@ class _FuelChargesScreenState extends ConsumerState<FuelChargesScreen> {
   String? _deletingId;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => _jumpToLatestMonthWithData());
+  }
+
+  /// Si el mes seleccionado (el actual, al abrir) no tiene cargas, arranca en
+  /// el último mes que sí tenga, en vez de mostrar un mes vacío.
+  Future<void> _jumpToLatestMonthWithData() async {
+    final charges =
+        await ref.read(fuelChargesByVehicleProvider(widget.vehicleId).future);
+    if (!mounted || charges.isEmpty) return;
+
+    final selected = ref.read(selectedMonthProvider(widget.vehicleId));
+    final now = DateTime.now();
+    final userNavigated = selected.year != now.year || selected.month != now.month;
+    if (userNavigated) return;
+
+    final hasChargesInSelected = charges.any(
+        (c) => c.date.year == selected.year && c.date.month == selected.month);
+    if (hasChargesInSelected) return;
+
+    final latest = charges
+        .map((c) => c.date)
+        .reduce((a, b) => a.isAfter(b) ? a : b);
+    ref.read(selectedMonthProvider(widget.vehicleId).notifier).state =
+        SelectedMonthState(year: latest.year, month: latest.month);
+  }
+
+  @override
   Widget build(BuildContext context) {
     final selectedMonth = ref.watch(selectedMonthProvider(widget.vehicleId));
     final chargesParams = MonthlyFuelParams(
@@ -84,9 +114,12 @@ class _FuelChargesScreenState extends ConsumerState<FuelChargesScreen> {
                 physics: const AlwaysScrollableScrollPhysics(),
                 child: Column(
                   children: [
-                    // Summary card
+                    // Summary card (si el mes está vacío, alcanza con el
+                    // empty state de la lista — no duplicar el mensaje)
                     summaryAsync.when(
-                      data: (summary) => FuelSummaryCard(summary: summary),
+                      data: (summary) => summary.chargeCount == 0
+                          ? const SizedBox.shrink()
+                          : FuelSummaryCard(summary: summary),
                       loading: () => const Padding(
                         padding: EdgeInsets.all(32),
                         child: CircularProgressIndicator(),
