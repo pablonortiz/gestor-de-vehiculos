@@ -241,6 +241,7 @@ class _FuelChargeFormSheetState extends ConsumerState<FuelChargeFormSheet> {
                   controller: _litersController,
                   decoration: InputDecoration(
                     labelText: 'Litros *',
+                    hintText: 'Ej: 23,5',
                     suffixText: 'L',
                     suffixIcon: _litersFromOcr
                         ? const Icon(Icons.check_circle, color: AppTheme.success, size: 20)
@@ -251,8 +252,15 @@ class _FuelChargeFormSheetState extends ConsumerState<FuelChargeFormSheet> {
                     if (value == null || value.isEmpty) {
                       return 'Ingrese los litros';
                     }
-                    if (double.tryParse(value.replaceAll(',', '.')) == null) {
+                    final liters = double.tryParse(value.replaceAll(',', '.'));
+                    if (liters == null) {
                       return 'Número inválido';
+                    }
+                    if (liters <= 0) {
+                      return 'Los litros deben ser mayores a 0';
+                    }
+                    if (liters > FuelCharge.maxPlausibleLiters) {
+                      return 'Valor muy alto (máx. ${FuelCharge.maxPlausibleLiters.toInt()} L). ¿Faltó la coma decimal?';
                     }
                     return null;
                   },
@@ -421,7 +429,7 @@ class _FuelChargeFormSheetState extends ConsumerState<FuelChargeFormSheet> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
+          const SnackBar(content: Text('No se pudo guardar la carga')),
         );
       }
     } finally {

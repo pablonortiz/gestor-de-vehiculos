@@ -16,6 +16,9 @@ import '../../domain/models/city.dart';
 import '../../domain/models/lugar.dart';
 import '../../domain/models/fuel_charge.dart';
 
+/// Reintentos por ítem de la cola antes de pasarlo a "fallido" (dead-letter).
+const kMaxSyncRetries = 5;
+
 enum SyncStatus {
   idle,
   syncing,
@@ -380,7 +383,14 @@ class SyncService extends StateNotifier<SyncState> {
 
   Future<void> _drainSyncQueue() async {
     final db = await _db.database;
-    final queue = await db.query('sync_queue', orderBy: 'created_at ASC');
+    // Los que agotaron reintentos quedan como dead-letter (visibles en
+    // Ajustes, reintentables a mano) en vez de descartarse.
+    final queue = await db.query(
+      'sync_queue',
+      where: 'retry_count < ?',
+      whereArgs: [kMaxSyncRetries],
+      orderBy: 'created_at ASC',
+    );
 
     for (final item in queue) {
       try {
@@ -410,24 +420,19 @@ class SyncService extends StateNotifier<SyncState> {
         // Eliminar de la cola si fue exitoso
         await db.delete('sync_queue', where: 'id = ?', whereArgs: [item['id']]);
       } catch (e) {
-        // Incrementar retry count
         final retryCount = (item['retry_count'] as int) + 1;
-        if (retryCount >= 5) {
-          // Eliminar después de 5 intentos, dejando rastro de la operación
-          // descartada (pérdida de dato silenciosa de lo contrario).
+        if (retryCount >= kMaxSyncRetries) {
           debugPrint(
-            '⚠️ [SYNC] Operación descartada tras 5 reintentos: '
+            '⚠️ [SYNC] Operación pasa a fallida tras $kMaxSyncRetries reintentos: '
             '${item['operation']} ${item['table_name']} #${item['record_id']} — error: $e',
           );
-          await db.delete('sync_queue', where: 'id = ?', whereArgs: [item['id']]);
-        } else {
-          await db.update(
-            'sync_queue',
-            {'retry_count': retryCount},
-            where: 'id = ?',
-            whereArgs: [item['id']],
-          );
         }
+        await db.update(
+          'sync_queue',
+          {'retry_count': retryCount},
+          where: 'id = ?',
+          whereArgs: [item['id']],
+        );
       }
     }
   }
@@ -454,12 +459,52 @@ class SyncService extends StateNotifier<SyncState> {
     }
   }
 
+  /// Reencola los ítems fallidos (dead-letter) y dispara un sync.
+  Future<void> retryFailedItems() async {
+    final db = await _db.database;
+    await db.update(
+      'sync_queue',
+      {'retry_count': 0},
+      where: 'retry_count >= ?',
+      whereArgs: [kMaxSyncRetries],
+    );
+    await fullSync();
+  }
+
   @override
   void dispose() {
     _connectivitySub?.cancel();
     super.dispose();
   }
 }
+
+/// Conteos de la cola de sincronización para mostrar en Ajustes.
+class SyncQueueCounts {
+  final int pending;
+  final int failed;
+
+  const SyncQueueCounts({required this.pending, required this.failed});
+
+  bool get isEmpty => pending == 0 && failed == 0;
+}
+
+final syncQueueCountsProvider =
+    FutureProvider.autoDispose<SyncQueueCounts>((ref) async {
+  // Refrescar cada vez que cambia el estado de sync.
+  ref.watch(syncServiceProvider);
+  final db = await DatabaseHelper.instance.database;
+  final rows = await db.rawQuery(
+    'SELECT '
+    'SUM(CASE WHEN retry_count < $kMaxSyncRetries THEN 1 ELSE 0 END) AS pending, '
+    'SUM(CASE WHEN retry_count >= $kMaxSyncRetries THEN 1 ELSE 0 END) AS failed '
+    'FROM sync_queue',
+  );
+  final row = rows.first;
+  return SyncQueueCounts(
+    pending: (row['pending'] as int?) ?? 0,
+    failed: (row['failed'] as int?) ?? 0,
+  );
+});
 
 // Provider para el servicio de sincronización
 final syncServiceProvider = StateNotifierProvider<SyncService, SyncState>((ref) {

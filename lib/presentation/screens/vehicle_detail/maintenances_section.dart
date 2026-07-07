@@ -15,11 +15,19 @@ class _MaintenancesSection extends ConsumerStatefulWidget {
 }
 
 class _MaintenancesSectionState extends ConsumerState<_MaintenancesSection> {
-  bool _isDeleting = false;
+  // Borrado diferido: ocultos mientras corre el SnackBar de "Deshacer".
+  final Set<String> _pendingDeleteIds = {};
 
   @override
   Widget build(BuildContext context) {
     final dateFormat = DateFormat('dd/MM/yyyy');
+    final maintenances = widget.maintenances
+        .where((m) => !_pendingDeleteIds.contains(m.id))
+        .toList();
+    final totalCost =
+        maintenances.fold<double>(0, (sum, m) => sum + (m.cost ?? 0));
+    final withoutCost =
+        maintenances.where((m) => (m.cost ?? 0) == 0).length;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -31,32 +39,37 @@ class _MaintenancesSectionState extends ConsumerState<_MaintenancesSection> {
             IconButton(
               onPressed: () => _showMaintenanceDialog(null),
               icon: const Icon(Icons.add, color: AppTheme.accentPrimary),
+              tooltip: 'Agregar mantenimiento',
             ),
           ],
         ),
-        const SizedBox(height: 12),
-        if (widget.maintenances.isEmpty)
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppTheme.surface,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppTheme.border),
-            ),
-            child: const Center(
-              child: Text(
-                'Sin mantenimientos registrados',
-                style: TextStyle(color: AppTheme.textSecondary),
+        if (totalCost > 0)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Text(
+              withoutCost > 0
+                  ? 'Total: ${AppFormats.money(totalCost)} · $withoutCost sin costo cargado'
+                  : 'Total: ${AppFormats.money(totalCost)}',
+              style: const TextStyle(
+                fontSize: 13,
+                color: AppTheme.textSecondary,
               ),
             ),
+          ),
+        const SizedBox(height: 12),
+        if (maintenances.isEmpty)
+          EmptyState(
+            icon: Icons.build_outlined,
+            message: 'Sin mantenimientos registrados',
+            actionLabel: 'Agregar mantenimiento',
+            onAction: () => _showMaintenanceDialog(null),
           )
         else
-          ...widget.maintenances.map((m) => _MaintenanceCard(
+          ...maintenances.map((m) => _MaintenanceCard(
             maintenance: m,
             dateFormat: dateFormat,
             onTap: () => _showMaintenanceDialog(m),
             onDelete: () => _deleteMaintenance(m),
-            isDeleting: _isDeleting,
           )),
       ],
     );
@@ -87,22 +100,32 @@ class _MaintenancesSectionState extends ConsumerState<_MaintenancesSection> {
   Future<void> _deleteMaintenance(Maintenance maintenance) async {
     if (!await confirmDelete(context,
         title: 'Eliminar mantenimiento',
-        message: '¿Eliminar este mantenimiento y sus facturas? No se puede deshacer.')) {
+        message: '¿Eliminar este mantenimiento y sus facturas?')) {
       return;
     }
     if (!mounted) return;
-    setState(() => _isDeleting = true);
+
+    // Diferido: se oculta ya, y el delete real corre cuando expira el
+    // SnackBar (si el usuario no tocó "Deshacer").
+    final messenger = ScaffoldMessenger.of(context);
+    final maintenanceRepo = ref.read(maintenanceRepositoryProvider);
+    setState(() => _pendingDeleteIds.add(maintenance.id!));
+
+    final controller = messenger.showSnackBar(SnackBar(
+      content: const Text('Mantenimiento eliminado'),
+      duration: const Duration(seconds: 5),
+      action: SnackBarAction(label: 'Deshacer', onPressed: () {}),
+    ));
+    final reason = await controller.closed;
+
+    if (reason == SnackBarClosedReason.action) {
+      if (mounted) setState(() => _pendingDeleteIds.remove(maintenance.id));
+      return;
+    }
     try {
-      final maintenanceRepo = ref.read(maintenanceRepositoryProvider);
       await maintenanceRepo.deleteMaintenance(maintenance.id!);
-      ref.invalidate(maintenancesByVehicleProvider(widget.vehicleId));
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Mantenimiento eliminado')),
-        );
-      }
     } finally {
-      if (mounted) setState(() => _isDeleting = false);
+      if (mounted) setState(() => _pendingDeleteIds.remove(maintenance.id));
     }
   }
 }
@@ -481,29 +504,20 @@ class _MaintenanceCard extends StatelessWidget {
   final DateFormat dateFormat;
   final VoidCallback onTap;
   final VoidCallback onDelete;
-  final bool isDeleting;
 
   const _MaintenanceCard({
     required this.maintenance,
     required this.dateFormat,
     required this.onTap,
     required this.onDelete,
-    this.isDeleting = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: isDeleting ? null : onTap,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppTheme.surface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppTheme.border),
-        ),
-        child: Column(
+    return AppCard(
+      onTap: onTap,
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
@@ -540,16 +554,24 @@ class _MaintenanceCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                isDeleting
-                    ? const SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : IconButton(
-                        onPressed: onDelete,
-                        icon: const Icon(Icons.delete_outline, color: AppTheme.error, size: 20),
+                if (maintenance.cost != null && maintenance.cost! > 0)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 4),
+                    child: Text(
+                      AppFormats.money(maintenance.cost!),
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.accentPrimary,
                       ),
+                    ),
+                  ),
+                IconButton(
+                  onPressed: onDelete,
+                  icon: const Icon(Icons.delete_outline,
+                      color: AppTheme.error, size: 20),
+                  tooltip: 'Eliminar mantenimiento',
+                ),
               ],
             ),
             const SizedBox(height: 8),
@@ -564,7 +586,6 @@ class _MaintenanceCard extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
             ),
           ],
-        ),
       ),
     );
   }

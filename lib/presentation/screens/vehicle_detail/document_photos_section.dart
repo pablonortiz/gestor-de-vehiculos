@@ -102,6 +102,7 @@ class _DocumentPhotosSectionState extends ConsumerState<_DocumentPhotosSection> 
                       color: AppTheme.accentPrimary,
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(),
+                      tooltip: 'Agregar foto del documento',
                     ),
             ],
           ),
@@ -215,7 +216,7 @@ class _DocumentPhotosSectionState extends ConsumerState<_DocumentPhotosSection> 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error al subir el documento: $e'),
+            content: const Text('No se pudo subir el documento'),
             backgroundColor: AppTheme.error,
           ),
         );
@@ -269,7 +270,7 @@ class _DocumentPhotosSectionState extends ConsumerState<_DocumentPhotosSection> 
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('Error al eliminar el documento: $e'),
+                        content: const Text('No se pudo eliminar el documento'),
                         backgroundColor: AppTheme.error,
                       ),
                     );

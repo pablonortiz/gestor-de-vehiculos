@@ -41,7 +41,15 @@ class ExpenseDashboard {
   final List<VehicleExpense> byVehicle;
   final List<MonthlyExpense> byMonth;
 
-  const ExpenseDashboard({required this.byVehicle, required this.byMonth});
+  /// Mantenimientos del rango sin costo cargado: gasto real que el dashboard
+  /// no puede sumar. Sirve para avisar que los totales están incompletos.
+  final int uncostedMaintenances;
+
+  const ExpenseDashboard({
+    required this.byVehicle,
+    required this.byMonth,
+    this.uncostedMaintenances = 0,
+  });
 
   double get fuelTotal =>
       byMonth.fold(0.0, (sum, m) => sum + m.fuelTotal);
@@ -85,9 +93,14 @@ ExpenseDashboard buildExpenseDashboard({
     fuelByMonth.update(key, (v) => v + charge.price, ifAbsent: () => charge.price);
   }
 
+  var uncostedMaintenances = 0;
   for (final maintenance in maintenances) {
     final cost = maintenance.cost ?? 0;
-    if (cost == 0 || !inRange(maintenance.date)) continue;
+    if (!inRange(maintenance.date)) continue;
+    if (cost == 0) {
+      uncostedMaintenances++;
+      continue;
+    }
     maintByVehicle.update(maintenance.vehicleId, (v) => v + cost,
         ifAbsent: () => cost);
     final key = monthKey(maintenance.date.year, maintenance.date.month);
@@ -114,5 +127,9 @@ ExpenseDashboard buildExpenseDashboard({
           ))
       .toList();
 
-  return ExpenseDashboard(byVehicle: byVehicle, byMonth: byMonth);
+  return ExpenseDashboard(
+    byVehicle: byVehicle,
+    byMonth: byMonth,
+    uncostedMaintenances: uncostedMaintenances,
+  );
 }

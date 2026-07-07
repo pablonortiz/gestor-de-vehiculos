@@ -207,6 +207,16 @@ class _HistoryItem extends StatelessWidget {
     this.isCreation = false,
   });
 
+  static final _isoDate = RegExp(r'^\d{4}-\d{2}-\d{2}');
+
+  /// Los vencimientos se registran como ISO crudo (2026-04-27T21:00:00.000);
+  /// acá se muestran como fecha legible.
+  static String _displayValue(String value) {
+    if (!_isoDate.hasMatch(value)) return value;
+    final date = DateTime.tryParse(value);
+    return date == null ? value : DateFormat('dd/MM/yyyy').format(date);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -285,7 +295,7 @@ class _HistoryItem extends StatelessWidget {
                               ),
                               const SizedBox(height: 2),
                               Text(
-                                oldValue.isEmpty ? '-' : oldValue,
+                                oldValue.isEmpty ? '-' : _displayValue(oldValue),
                                 style: TextStyle(
                                   fontSize: 13,
                                   color: AppTheme.error.withValues(alpha: 0.8),
@@ -318,7 +328,7 @@ class _HistoryItem extends StatelessWidget {
                               ),
                               const SizedBox(height: 2),
                               Text(
-                                newValue.isEmpty ? '-' : newValue,
+                                newValue.isEmpty ? '-' : _displayValue(newValue),
                                 style: TextStyle(
                                   fontSize: 13,
                                   color: AppTheme.success,

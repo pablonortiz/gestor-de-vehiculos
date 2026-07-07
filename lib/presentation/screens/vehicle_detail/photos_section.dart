@@ -54,29 +54,17 @@ class _PhotosSectionState extends ConsumerState<_PhotosSection> {
                 : IconButton(
                     onPressed: _addPhoto,
                     icon: const Icon(Icons.add_a_photo, color: AppTheme.accentPrimary),
+                    tooltip: 'Agregar foto',
                   ),
           ],
         ),
         const SizedBox(height: 12),
         if (widget.photos.isEmpty && !_isUploading)
-          Container(
-            height: 100,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: AppTheme.surface,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppTheme.border),
-            ),
-            child: const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.photo_library_outlined, color: AppTheme.textSecondary, size: 32),
-                  SizedBox(height: 8),
-                  Text('Sin fotos', style: TextStyle(color: AppTheme.textSecondary)),
-                ],
-              ),
-            ),
+          EmptyState(
+            icon: Icons.photo_library_outlined,
+            message: 'Sin fotos',
+            actionLabel: 'Agregar foto',
+            onAction: _addPhoto,
           )
         else
           SizedBox(
@@ -220,7 +208,7 @@ class _PhotosSectionState extends ConsumerState<_PhotosSection> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error al subir la foto: $e'),
+            content: const Text('No se pudo subir la foto'),
             backgroundColor: AppTheme.error,
           ),
         );

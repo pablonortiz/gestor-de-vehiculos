@@ -280,6 +280,17 @@ class Vehicle {
     );
   }
 
+  /// Documentos vencidos o por vencer (ventana 30 días), más urgente primero.
+  List<ExpiringDocument> get expiringDocuments {
+    final docs = <ExpiringDocument>[
+      if (isVtvExpired || isVtvExpiringSoon) ExpiringDocument('VTV', vtvExpiry!),
+      if (isInsuranceExpired || isInsuranceExpiringSoon)
+        ExpiringDocument('Seguro', insuranceExpiry!),
+    ];
+    docs.sort((a, b) => a.expiry.compareTo(b.expiry));
+    return docs;
+  }
+
   // Verificar si el VTV está por vencer (30 días)
   bool get isVtvExpiringSoon {
     if (vtvExpiry == null) return false;
@@ -359,4 +370,17 @@ class Vehicle {
         createdAt,
         updatedAt,
       ]);
+}
+
+/// Un documento del vehículo vencido o próximo a vencer.
+class ExpiringDocument {
+  final String label;
+  final DateTime expiry;
+
+  const ExpiringDocument(this.label, this.expiry);
+
+  bool get expired => expiry.isBefore(DateTime.now());
+
+  /// Días hasta el vencimiento (negativo si ya venció).
+  int get daysLeft => expiry.difference(DateTime.now()).inDays;
 }

@@ -63,13 +63,9 @@ class _VehiclesScreenState extends ConsumerState<VehiclesScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Vehículos',
-                        style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.textPrimary,
-                        ),
+                        style: Theme.of(context).textTheme.displayMedium,
                       ),
                       if (locationFilter.hasFilter)
                         _LocationFilterLabel(locationFilter: locationFilter),
@@ -344,12 +340,30 @@ class _VehicleCard extends StatelessWidget {
                         ),
                       ),
                       if (hasWarning)
-                        Icon(
-                          Icons.warning_amber_rounded,
-                          size: 18,
-                          color: vehicle.isVtvExpired || vehicle.isInsuranceExpired
-                              ? AppTheme.error
-                              : AppTheme.warning,
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.warning_amber_rounded,
+                              size: 18,
+                              color: vehicle.isVtvExpired || vehicle.isInsuranceExpired
+                                  ? AppTheme.error
+                                  : AppTheme.warning,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              vehicle.expiringDocuments
+                                  .map((d) => d.label)
+                                  .join(' · '),
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: vehicle.isVtvExpired || vehicle.isInsuranceExpired
+                                    ? AppTheme.error
+                                    : AppTheme.warning,
+                              ),
+                            ),
+                          ],
                         ),
                     ],
                   ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/formatters.dart';
 import '../../domain/models/fuel_charge.dart';
 
 /// Rendimiento (km/L) por tramo entre cargas consecutivas con odómetro. Ordena
@@ -107,7 +108,7 @@ class _LitersBarChart extends StatelessWidget {
                     getTooltipColor: (_) => AppTheme.surfaceLight,
                     getTooltipItem: (group, groupIndex, rod, rodIndex) {
                       return BarTooltipItem(
-                        '${rod.toY.toStringAsFixed(1)} L',
+                        AppFormats.liters(rod.toY),
                         const TextStyle(
                           color: AppTheme.textPrimary,
                           fontWeight: FontWeight.w600,
@@ -214,12 +215,6 @@ class _PriceLineChart extends StatelessWidget {
     final minY = (minPrice - range * 0.2).floorToDouble();
     final maxY = (maxPrice + range * 0.2).ceilToDouble();
 
-    final currencyFormat = NumberFormat.currency(
-      locale: 'es_AR',
-      symbol: '\$',
-      decimalDigits: 0,
-    );
-
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(16),
@@ -262,7 +257,7 @@ class _PriceLineChart extends StatelessWidget {
                     getTooltipItems: (touchedSpots) {
                       return touchedSpots.map((spot) {
                         return LineTooltipItem(
-                          '${currencyFormat.format(spot.y)}/L',
+                          '${AppFormats.money(spot.y)}/L',
                           const TextStyle(
                             color: AppTheme.textPrimary,
                             fontWeight: FontWeight.w600,
@@ -302,7 +297,7 @@ class _PriceLineChart extends StatelessWidget {
                       reservedSize: 45,
                       getTitlesWidget: (value, meta) {
                         return Text(
-                          currencyFormat.format(value),
+                          AppFormats.money(value),
                           style: const TextStyle(
                             color: AppTheme.textSecondary,
                             fontSize: 9,

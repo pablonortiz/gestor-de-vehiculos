@@ -7,9 +7,11 @@ import 'package:intl/intl.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../core/config/supabase_config.dart';
 import '../../core/constants/provinces.dart';
 import '../../core/constants/vehicle_constants.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/formatters.dart';
 import '../../domain/models/maintenance.dart';
 import '../../domain/models/vehicle.dart';
 import '../../domain/models/vehicle_note.dart';
@@ -18,6 +20,7 @@ import '../../domain/models/document_photo.dart';
 import '../../domain/models/fuel_charge.dart';
 import '../../data/repositories/document_photo_repository.dart';
 import '../../data/services/cloudinary_service.dart';
+import '../../data/services/sync_service.dart';
 import 'package:printing/printing.dart';
 import '../../data/services/pdf_service.dart';
 import '../providers/vehicle_provider.dart';
@@ -28,6 +31,8 @@ import '../../core/utils/contact_launcher.dart';
 import '../../core/utils/confirm_dialog.dart';
 import '../../core/utils/thousands_formatter.dart';
 import '../widgets/error_retry_view.dart';
+import '../widgets/empty_state.dart';
+import '../widgets/app_card.dart';
 
 part 'vehicle_detail/photos_section.dart';
 part 'vehicle_detail/document_photos_section.dart';
@@ -38,13 +43,50 @@ part 'vehicle_detail/detail_widgets.dart';
 part 'vehicle_detail/pdf_preview.dart';
 part 'vehicle_detail/pdf_export.dart';
 
-class VehicleDetailScreen extends ConsumerWidget {
+class VehicleDetailScreen extends ConsumerStatefulWidget {
   final String vehicleId;
+  final bool highlightDocs;
 
-  const VehicleDetailScreen({super.key, required this.vehicleId});
+  const VehicleDetailScreen({
+    super.key,
+    required this.vehicleId,
+    this.highlightDocs = false,
+  });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<VehicleDetailScreen> createState() =>
+      _VehicleDetailScreenState();
+}
+
+class _VehicleDetailScreenState extends ConsumerState<VehicleDetailScreen> {
+  final _docsSectionKey = GlobalKey();
+  late bool _docsScrollPending = widget.highlightDocs;
+
+  String get vehicleId => widget.vehicleId;
+
+  /// Al entrar desde "Documentos por Vencer", lleva la vista a Documentación.
+  /// Dos pasadas: las secciones async (fotos, adjuntos) cargan después del
+  /// primer frame y corren el layout, así que la segunda corrige el desvío.
+  void _scheduleDocsScroll() {
+    if (!_docsScrollPending) return;
+    _docsScrollPending = false;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      for (final delay in const [100, 700]) {
+        await Future.delayed(Duration(milliseconds: delay));
+        if (!mounted) return;
+        final docsContext = _docsSectionKey.currentContext;
+        if (docsContext == null || !docsContext.mounted) continue;
+        await Scrollable.ensureVisible(
+          docsContext,
+          duration: const Duration(milliseconds: 300),
+          alignment: 0.05,
+        );
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     // El refresco post-sync de fotos/documentos/mantenimientos/notas/combustible
     // ya ocurre solo: replaceAllData emite notifyChange de esas tablas y cada
     // provider watchea su *ChangeProvider. No hace falta invalidar manualmente.
@@ -63,10 +105,24 @@ class VehicleDetailScreen extends ConsumerWidget {
             return const Center(child: Text('Vehículo no encontrado'));
           }
 
+          _scheduleDocsScroll();
+
           final province = ArgentinaProvinces.getById(vehicle.provinceId);
           final dateFormat = DateFormat('dd/MM/yyyy');
 
-          return CustomScrollView(
+          return RefreshIndicator(
+            onRefresh: () async {
+              if (SupabaseConfig.isConfigured) {
+                await ref.read(syncServiceProvider.notifier).fullSync();
+              }
+              ref.invalidate(vehicleByIdProvider(vehicleId));
+              ref.invalidate(maintenancesByVehicleProvider(vehicleId));
+              ref.invalidate(notesByVehicleProvider(vehicleId));
+              ref.invalidate(photosByVehicleProvider(vehicleId));
+              ref.invalidate(documentPhotosByVehicleProvider(vehicleId));
+              ref.invalidate(recentFuelChargesProvider(vehicleId));
+            },
+            child: CustomScrollView(
             slivers: [
               // App Bar con icono sticky
               SliverAppBar(
@@ -323,7 +379,7 @@ class VehicleDetailScreen extends ConsumerWidget {
                                   child: _ContactButton(
                                     icon: Icons.message,
                                     label: 'WhatsApp',
-                                    color: const Color(0xFF25D366),
+                                    color: AppTheme.whatsapp,
                                     onTap: () => ContactLauncher.openWhatsApp(vehicle.responsiblePhone),
                                   ),
                                 ),
@@ -367,7 +423,7 @@ class VehicleDetailScreen extends ConsumerWidget {
                           _InfoRow(
                             icon: Icons.speed,
                             label: 'Kilometraje',
-                            value: '${NumberFormat('#,###').format(vehicle.km)} km',
+                            value: AppFormats.km(vehicle.km),
                           ),
                           _InfoRow(
                             icon: vehicle.fuelType.icon,
@@ -384,7 +440,10 @@ class VehicleDetailScreen extends ConsumerWidget {
                       const SizedBox(height: 24),
 
                       // Documentación
-                      _SectionTitle(title: 'Documentación'),
+                      KeyedSubtree(
+                        key: _docsSectionKey,
+                        child: _SectionTitle(title: 'Documentación'),
+                      ),
                       const SizedBox(height: 12),
                       _InfoCard(
                         children: [
@@ -459,8 +518,15 @@ class VehicleDetailScreen extends ConsumerWidget {
                           maintenances: maintenances,
                           vehicleId: vehicleId,
                         ),
-                        loading: () => const Center(child: CircularProgressIndicator()),
-                        error: (e, _) => Text('Error: $e'),
+                        loading: () => const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 24),
+                          child: Center(child: CircularProgressIndicator()),
+                        ),
+                        error: (e, _) => ErrorRetryView(
+                          message: 'No se pudieron cargar los mantenimientos',
+                          onRetry: () => ref.invalidate(
+                              maintenancesByVehicleProvider(vehicleId)),
+                        ),
                       ),
                       const SizedBox(height: 24),
 
@@ -481,8 +547,15 @@ class VehicleDetailScreen extends ConsumerWidget {
                           notes: notes,
                           vehicleId: vehicleId,
                         ),
-                        loading: () => const Center(child: CircularProgressIndicator()),
-                        error: (e, _) => Text('Error: $e'),
+                        loading: () => const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 24),
+                          child: Center(child: CircularProgressIndicator()),
+                        ),
+                        error: (e, _) => ErrorRetryView(
+                          message: 'No se pudieron cargar las notas',
+                          onRetry: () =>
+                              ref.invalidate(notesByVehicleProvider(vehicleId)),
+                        ),
                       ),
 
                       const SizedBox(height: 32),
@@ -504,6 +577,7 @@ class VehicleDetailScreen extends ConsumerWidget {
                 ),
               ),
             ],
+            ),
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -581,7 +655,7 @@ class VehicleDetailScreen extends ConsumerWidget {
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text('Error: $e'),
+                              content: Text('No se pudo eliminar el vehículo'),
                               backgroundColor: AppTheme.error,
                             ),
                           );

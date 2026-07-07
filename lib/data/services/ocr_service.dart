@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
+import '../../domain/models/fuel_charge.dart';
 
 class OcrResult {
   final double? value;
@@ -28,8 +29,8 @@ class OcrService {
   // Techo plausible para un gasto de combustible: descarta CUIT (11 dígitos),
   // números de comprobante y otros tokens grandes que no son el total.
   static const double _maxPlausiblePrice = 10000000;
-  // Rango plausible de litros de una carga.
-  static const double _maxPlausibleLiters = 200;
+  // Rango plausible de litros de una carga (compartido con el form).
+  static const double _maxPlausibleLiters = FuelCharge.maxPlausibleLiters;
 
   // Extract liters from a pump display photo
   Future<OcrResult> extractLiters(File imageFile) async {

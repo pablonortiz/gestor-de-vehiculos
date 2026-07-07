@@ -80,8 +80,13 @@ class NotificationService {
   }
 
   /// Reprograma los recordatorios de un vehículo (cancela los previos primero).
+  /// Si el vehículo tiene vencimientos, pide permiso acá: es el momento con
+  /// contexto (el usuario acaba de cargar una fecha a recordar).
   Future<void> scheduleForVehicle(Vehicle vehicle) async {
     await init();
+    if (vehicle.vtvExpiry != null || vehicle.insuranceExpiry != null) {
+      await requestPermission();
+    }
     await cancelForVehicle(vehicle.id ?? '');
     await _scheduleAll(vehicle);
   }

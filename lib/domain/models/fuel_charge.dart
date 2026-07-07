@@ -1,4 +1,8 @@
 class FuelCharge {
+  /// Techo plausible de litros por carga. Sobre este valor casi seguro se
+  /// tipearon los litros del surtidor sin el separador decimal (23.562 → 23562).
+  static const double maxPlausibleLiters = 200;
+
   final String? id;
   final String vehicleId;
   final DateTime date;

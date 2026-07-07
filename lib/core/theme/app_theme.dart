@@ -26,6 +26,9 @@ class AppTheme {
   // Bordes y divisores
   static const Color border = Color(0xFF2A4060); // Borde azulado
 
+  // Colores de marca de terceros
+  static const Color whatsapp = Color(0xFF25D366);
+
   static ThemeData get darkTheme {
     return ThemeData(
       useMaterial3: true,
@@ -135,13 +138,6 @@ class AppTheme {
       dividerTheme: const DividerThemeData(
         color: border,
         thickness: 1,
-      ),
-      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-        backgroundColor: surface,
-        selectedItemColor: accentPrimary,
-        unselectedItemColor: textSecondary,
-        type: BottomNavigationBarType.fixed,
-        elevation: 0,
       ),
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: surface,
