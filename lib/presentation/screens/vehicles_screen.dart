@@ -63,13 +63,9 @@ class _VehiclesScreenState extends ConsumerState<VehiclesScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Vehículos',
-                        style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.textPrimary,
-                        ),
+                        style: Theme.of(context).textTheme.displayMedium,
                       ),
                       if (locationFilter.hasFilter)
                         _LocationFilterLabel(locationFilter: locationFilter),

@@ -32,6 +32,7 @@ import '../../core/utils/confirm_dialog.dart';
 import '../../core/utils/thousands_formatter.dart';
 import '../widgets/error_retry_view.dart';
 import '../widgets/empty_state.dart';
+import '../widgets/app_card.dart';
 
 part 'vehicle_detail/photos_section.dart';
 part 'vehicle_detail/document_photos_section.dart';
@@ -378,7 +379,7 @@ class _VehicleDetailScreenState extends ConsumerState<VehicleDetailScreen> {
                                   child: _ContactButton(
                                     icon: Icons.message,
                                     label: 'WhatsApp',
-                                    color: const Color(0xFF25D366),
+                                    color: AppTheme.whatsapp,
                                     onTap: () => ContactLauncher.openWhatsApp(vehicle.responsiblePhone),
                                   ),
                                 ),

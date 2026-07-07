@@ -174,13 +174,10 @@ class HomeScreen extends ConsumerWidget {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text(
+                          Text(
                             'Por Provincia',
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w600,
-                              color: AppTheme.textPrimary,
-                            ),
+                            style:
+                                Theme.of(context).textTheme.headlineMedium,
                           ),
                           TextButton(
                             onPressed: () => context.go('/vehicles'),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
+import 'app_card.dart';
 
 /// Empty state homogéneo: ícono + mensaje + CTA opcional.
 class EmptyState extends StatelessWidget {
@@ -18,14 +19,8 @@ class EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
+    return AppCard(
       padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.border),
-      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
