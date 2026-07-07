@@ -20,6 +20,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Widget build(BuildContext context) {
     final totalCountAsync = ref.watch(totalVehicleCountProvider);
     final syncState = ref.watch(syncServiceProvider);
+    final queueCounts = ref.watch(syncQueueCountsProvider).valueOrNull;
 
     return SafeArea(
       child: ListView(
@@ -194,6 +195,33 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 : const Icon(Icons.chevron_right, color: AppTheme.textSecondary),
             onTap: !SupabaseConfig.isConfigured || _isSyncing ? null : _syncNow,
           ),
+
+          // Cambios locales que todavía no llegaron a la nube
+          if (queueCounts != null && !queueCounts.isEmpty) ...[
+            const SizedBox(height: 12),
+            if (queueCounts.pending > 0)
+              _SettingsTile(
+                icon: Icons.cloud_upload_outlined,
+                title: queueCounts.pending == 1
+                    ? '1 cambio pendiente de sincronizar'
+                    : '${queueCounts.pending} cambios pendientes de sincronizar',
+                subtitle: 'Se suben automáticamente al reconectar',
+              ),
+            if (queueCounts.failed > 0) ...[
+              const SizedBox(height: 12),
+              _SettingsTile(
+                icon: Icons.error_outline,
+                title: queueCounts.failed == 1
+                    ? '1 cambio no se pudo sincronizar'
+                    : '${queueCounts.failed} cambios no se pudieron sincronizar',
+                subtitle: 'Tocá para reintentar',
+                trailing:
+                    const Icon(Icons.refresh, color: AppTheme.warning),
+                onTap: () =>
+                    ref.read(syncServiceProvider.notifier).retryFailedItems(),
+              ),
+            ],
+          ],
           const SizedBox(height: 32),
 
           // Sección Info
