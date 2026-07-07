@@ -53,7 +53,7 @@ class _FuelChargeFormSheetState extends ConsumerState<FuelChargeFormSheet> {
     super.initState();
     _selectedDate = widget.existing?.date ?? DateTime.now();
     _litersController = TextEditingController(
-      text: widget.existing?.liters.toString() ?? '',
+      text: widget.existing?.liters.toString().replaceAll('.', ',') ?? '',
     );
     _priceController = TextEditingController(
       text: widget.existing != null
@@ -225,7 +225,10 @@ class _FuelChargeFormSheetState extends ConsumerState<FuelChargeFormSheet> {
                             _displayIsPdf = result.isPdf;
                             _displayFileName = result.fileName;
                             if (result.extractedValue != null) {
-                              _litersController.text = result.extractedValue!.toStringAsFixed(2);
+                              _litersController.text = result
+                                  .extractedValue!
+                                  .toStringAsFixed(2)
+                                  .replaceAll('.', ',');
                               _litersFromOcr = true;
                             }
                           });
@@ -248,6 +251,7 @@ class _FuelChargeFormSheetState extends ConsumerState<FuelChargeFormSheet> {
                         : null,
                   ),
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: [DecimalCommaFormatter()],
                   validator: (value) {
                     if (value == null || value.isEmpty) {
                       return 'Ingrese los litros';

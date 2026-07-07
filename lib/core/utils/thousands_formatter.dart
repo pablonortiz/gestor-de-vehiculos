@@ -13,6 +13,24 @@ String formatWithDots(String digits) {
   return buffer.toString();
 }
 
+/// Para campos decimales (ej. litros): el "." se retransforma a "," al tipear.
+/// En una carga nunca van miles de litros, así que un punto solo puede querer
+/// decir separador decimal — se muestra en convención es_AR en vez de castigar
+/// después con un error. Admite una sola coma y solo dígitos.
+class DecimalCommaFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final text = newValue.text.replaceAll('.', ',');
+    if (RegExp(r'^[0-9]*,?[0-9]*$').hasMatch(text)) {
+      return newValue.copyWith(text: text);
+    }
+    return oldValue;
+  }
+}
+
 class ThousandsSeparatorFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(
