@@ -15,11 +15,15 @@ class _NotesSection extends ConsumerStatefulWidget {
 }
 
 class _NotesSectionState extends ConsumerState<_NotesSection> {
-  bool _isDeleting = false;
+  // Borrado diferido: ocultas mientras corre el SnackBar de "Deshacer".
+  final Set<String> _pendingDeleteIds = {};
 
   @override
   Widget build(BuildContext context) {
     final dateFormat = DateFormat('dd/MM/yyyy HH:mm');
+    final notes = widget.notes
+        .where((n) => !_pendingDeleteIds.contains(n.id))
+        .toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -36,7 +40,7 @@ class _NotesSectionState extends ConsumerState<_NotesSection> {
           ],
         ),
         const SizedBox(height: 12),
-        if (widget.notes.isEmpty)
+        if (notes.isEmpty)
           EmptyState(
             icon: Icons.note_outlined,
             message: 'Sin notas',
@@ -44,12 +48,11 @@ class _NotesSectionState extends ConsumerState<_NotesSection> {
             onAction: () => _showNoteDialog(null),
           )
         else
-          ...widget.notes.map((n) => _NoteCard(
+          ...notes.map((n) => _NoteCard(
             note: n,
             dateFormat: dateFormat,
             onTap: () => _showNoteDialog(n),
             onDelete: () => _deleteNote(n),
-            isDeleting: _isDeleting,
           )),
       ],
     );
@@ -80,22 +83,30 @@ class _NotesSectionState extends ConsumerState<_NotesSection> {
   Future<void> _deleteNote(VehicleNote note) async {
     if (!await confirmDelete(context,
         title: 'Eliminar nota',
-        message: '¿Eliminar esta nota y sus fotos? No se puede deshacer.')) {
+        message: '¿Eliminar esta nota y sus fotos?')) {
       return;
     }
     if (!mounted) return;
-    setState(() => _isDeleting = true);
+
+    final messenger = ScaffoldMessenger.of(context);
+    final noteRepo = ref.read(noteRepositoryProvider);
+    setState(() => _pendingDeleteIds.add(note.id!));
+
+    final controller = messenger.showSnackBar(SnackBar(
+      content: const Text('Nota eliminada'),
+      duration: const Duration(seconds: 5),
+      action: SnackBarAction(label: 'Deshacer', onPressed: () {}),
+    ));
+    final reason = await controller.closed;
+
+    if (reason == SnackBarClosedReason.action) {
+      if (mounted) setState(() => _pendingDeleteIds.remove(note.id));
+      return;
+    }
     try {
-      final noteRepo = ref.read(noteRepositoryProvider);
       await noteRepo.deleteNote(note.id!);
-      ref.invalidate(notesByVehicleProvider(widget.vehicleId));
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Nota eliminada')),
-        );
-      }
     } finally {
-      if (mounted) setState(() => _isDeleting = false);
+      if (mounted) setState(() => _pendingDeleteIds.remove(note.id));
     }
   }
 }
@@ -501,20 +512,18 @@ class _NoteCard extends StatelessWidget {
   final DateFormat dateFormat;
   final VoidCallback onTap;
   final VoidCallback onDelete;
-  final bool isDeleting;
 
   const _NoteCard({
     required this.note,
     required this.dateFormat,
     required this.onTap,
     required this.onDelete,
-    this.isDeleting = false,
   });
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: isDeleting ? null : onTap,
+      onTap: onTap,
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
@@ -559,17 +568,12 @@ class _NoteCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                isDeleting
-                    ? const SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : IconButton(
-                        onPressed: onDelete,
-                        icon: const Icon(Icons.delete_outline, color: AppTheme.error, size: 20),
-                        tooltip: 'Eliminar nota',
-                      ),
+                IconButton(
+                  onPressed: onDelete,
+                  icon: const Icon(Icons.delete_outline,
+                      color: AppTheme.error, size: 20),
+                  tooltip: 'Eliminar nota',
+                ),
               ],
             ),
             const SizedBox(height: 8),

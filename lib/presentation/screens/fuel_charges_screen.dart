@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/confirm_dialog.dart';
 import '../widgets/error_retry_view.dart';
 import '../widgets/empty_state.dart';
 import '../../domain/models/fuel_charge.dart';
@@ -25,7 +26,8 @@ class FuelChargesScreen extends ConsumerStatefulWidget {
 
 class _FuelChargesScreenState extends ConsumerState<FuelChargesScreen> {
   bool _showCharts = false;
-  String? _deletingId;
+  // Borrado diferido: ocultas mientras corre el SnackBar de "Deshacer".
+  final Set<String> _pendingDeleteIds = {};
 
   @override
   void initState() {
@@ -160,12 +162,14 @@ class _FuelChargesScreenState extends ConsumerState<FuelChargesScreen> {
                           );
                         }
                         return Column(
-                          children: charges.map((charge) => FuelChargeCard(
-                            fuelCharge: charge,
-                            onTap: () => _showFuelChargeForm(charge),
-                            onDelete: () => _deleteCharge(charge),
-                            isDeleting: _deletingId == charge.id,
-                          )).toList(),
+                          children: charges
+                              .where((c) => !_pendingDeleteIds.contains(c.id))
+                              .map((charge) => FuelChargeCard(
+                                    fuelCharge: charge,
+                                    onTap: () => _showFuelChargeForm(charge),
+                                    onDelete: () => _deleteCharge(charge),
+                                  ))
+                              .toList(),
                         );
                       },
                       loading: () => const Padding(
@@ -194,55 +198,49 @@ class _FuelChargesScreenState extends ConsumerState<FuelChargesScreen> {
   }
 
   Future<void> _deleteCharge(FuelCharge charge) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Eliminar carga'),
-        content: const Text('¿Estás seguro de eliminar esta carga de combustible?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Eliminar', style: TextStyle(color: AppTheme.error)),
-          ),
-        ],
-      ),
+    final confirmed = await confirmDelete(
+      context,
+      title: 'Eliminar carga',
+      message: '¿Eliminar esta carga de combustible?',
     );
+    if (!confirmed || charge.id == null || !mounted) return;
 
-    if (confirmed != true || charge.id == null) return;
+    // Diferido: se oculta ya, y el delete real corre cuando expira el
+    // SnackBar (si el usuario no tocó "Deshacer").
+    final messenger = ScaffoldMessenger.of(context);
+    final repo = ref.read(fuelChargeRepositoryProvider);
+    setState(() => _pendingDeleteIds.add(charge.id!));
 
-    setState(() => _deletingId = charge.id);
+    final controller = messenger.showSnackBar(SnackBar(
+      content: const Text('Carga eliminada'),
+      duration: const Duration(seconds: 5),
+      action: SnackBarAction(label: 'Deshacer', onPressed: () {}),
+    ));
+    final reason = await controller.closed;
 
+    if (reason == SnackBarClosedReason.action) {
+      if (mounted) setState(() => _pendingDeleteIds.remove(charge.id));
+      return;
+    }
     try {
-      final repo = ref.read(fuelChargeRepositoryProvider);
       await repo.deleteFuelCharge(charge.id!);
-
-      // Refresh data
-      final selectedMonth = ref.read(selectedMonthProvider(widget.vehicleId));
-      final params = MonthlyFuelParams(
-        vehicleId: widget.vehicleId,
-        year: selectedMonth.year,
-        month: selectedMonth.month,
-      );
-      ref.invalidate(fuelChargesByMonthProvider(params));
-      ref.invalidate(fuelChargeSummaryProvider(params));
-      ref.invalidate(fuelChartDataProvider(
-        ChartDataParams(vehicleId: widget.vehicleId, months: 6),
-      ));
-      ref.invalidate(recentFuelChargesProvider(widget.vehicleId));
-
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Carga eliminada')),
+        final selectedMonth =
+            ref.read(selectedMonthProvider(widget.vehicleId));
+        final params = MonthlyFuelParams(
+          vehicleId: widget.vehicleId,
+          year: selectedMonth.year,
+          month: selectedMonth.month,
         );
+        ref.invalidate(fuelChargesByMonthProvider(params));
+        ref.invalidate(fuelChargeSummaryProvider(params));
+        ref.invalidate(fuelChartDataProvider(
+          ChartDataParams(vehicleId: widget.vehicleId, months: 6),
+        ));
+        ref.invalidate(recentFuelChargesProvider(widget.vehicleId));
       }
     } finally {
-      if (mounted) {
-        setState(() => _deletingId = null);
-      }
+      if (mounted) setState(() => _pendingDeleteIds.remove(charge.id));
     }
   }
 
