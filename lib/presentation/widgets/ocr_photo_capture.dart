@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/thousands_formatter.dart';
 import '../../data/services/ocr_service.dart';
 import '../../data/services/cloudinary_service.dart';
 import 'ocr_photo_types.dart';
@@ -16,7 +17,6 @@ export 'ocr_photo_types.dart';
 class OcrPhotoCapture extends StatefulWidget {
   final OcrPhotoType type;
   final String? initialPhotoUrl;
-  final double? initialValue;
   final bool showOcrIndicator;
   final ValueChanged<OcrPhotoResult> onPhotoResult;
 
@@ -24,7 +24,6 @@ class OcrPhotoCapture extends StatefulWidget {
     super.key,
     required this.type,
     this.initialPhotoUrl,
-    this.initialValue,
     this.showOcrIndicator = false,
     required this.onPhotoResult,
   });
@@ -311,14 +310,14 @@ class _OcrPhotoCaptureState extends State<OcrPhotoCapture> {
 
       final file = File(pickedFile.path);
 
-      OcrResult ocrResult;
+      FuelOcrResult ocrResult;
       CloudinaryUploadResult? uploadResult;
       try {
         // Perform OCR
         final ocrService = OcrService.instance;
         ocrResult = widget.type == OcrPhotoType.receipt
-            ? await ocrService.extractPrice(file)
-            : await ocrService.extractLiters(file);
+            ? await ocrService.extractFromReceipt(file)
+            : await ocrService.extractFromPumpDisplay(file);
 
         // Upload to Cloudinary
         final cloudinary = CloudinaryService.instance;
@@ -344,7 +343,8 @@ class _OcrPhotoCaptureState extends State<OcrPhotoCapture> {
         widget.onPhotoResult(OcrPhotoResult(
           cloudinaryUrl: upload.url,
           cloudinaryPublicId: upload.publicId,
-          extractedValue: ocrResult.value,
+          extractedLiters: ocrResult.liters,
+          extractedPrice: ocrResult.price,
           ocrDetected: ocrResult.success,
           ocrText: ocrResult.fullText,
         ));
@@ -352,10 +352,15 @@ class _OcrPhotoCaptureState extends State<OcrPhotoCapture> {
         // Show snackbar with OCR result info
         if (mounted) {
           if (ocrResult.success) {
-            final valueType = widget.type == OcrPhotoType.receipt ? 'precio' : 'litros';
+            final detected = [
+              if (ocrResult.liters != null)
+                'litros: ${formatLitersAr(ocrResult.liters!)}',
+              if (ocrResult.price != null)
+                'precio: \$${formatWithDots(ocrResult.price!.toStringAsFixed(0))}',
+            ].join(' · ');
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('OCR detectó $valueType: ${ocrResult.rawText}'),
+                content: Text('OCR detectó $detected'),
                 backgroundColor: AppTheme.success,
                 duration: const Duration(seconds: 2),
               ),

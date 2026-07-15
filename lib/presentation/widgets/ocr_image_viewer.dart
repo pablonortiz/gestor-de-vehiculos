@@ -69,7 +69,7 @@ class OcrFullScreenViewer extends StatelessWidget {
               child: Text(
                 isReceipt
                     ? 'Pellizca para zoom. Busca el precio total en el ticket.'
-                    : 'Pellizca para zoom. Busca los litros en el display.',
+                    : 'Pellizca para zoom. Busca los litros y el importe en el display.',
                 style: const TextStyle(
                   color: Colors.white70,
                   fontSize: 14,
@@ -144,7 +144,7 @@ class OcrFullScreenViewer extends StatelessWidget {
               child: Text(
                 type == OcrPhotoType.receipt
                     ? 'Busca palabras como "Total", "Importe" o valores con "\$"'
-                    : 'Busca valores como "45.50 L" o "Litros: 45.50"',
+                    : 'Busca los litros (ej. "28.605") y el importe total del display',
                 style: const TextStyle(
                   fontSize: 12,
                   color: AppTheme.textSecondary,

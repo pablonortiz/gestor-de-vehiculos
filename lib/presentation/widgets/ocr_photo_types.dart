@@ -4,7 +4,8 @@ enum OcrPhotoType { receipt, display }
 class OcrPhotoResult {
   final String? cloudinaryUrl;
   final String? cloudinaryPublicId;
-  final double? extractedValue;
+  final double? extractedLiters;
+  final double? extractedPrice;
   final bool ocrDetected;
   final String? ocrText;
   final bool isPdf;
@@ -13,7 +14,8 @@ class OcrPhotoResult {
   OcrPhotoResult({
     this.cloudinaryUrl,
     this.cloudinaryPublicId,
-    this.extractedValue,
+    this.extractedLiters,
+    this.extractedPrice,
     this.ocrDetected = false,
     this.ocrText,
     this.isPdf = false,

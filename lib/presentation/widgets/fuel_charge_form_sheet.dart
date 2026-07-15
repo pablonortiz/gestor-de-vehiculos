@@ -91,6 +91,23 @@ class _FuelChargeFormSheetState extends ConsumerState<FuelChargeFormSheet> {
     if (!_hasChanges) _hasChanges = true;
   }
 
+  /// Vuelca al form lo que detectó el OCR. El valor primario del slot (precio
+  /// para el ticket, litros para el surtidor) pisa el campo; el secundario
+  /// solo completa si el campo está vacío, para no sobreescribir lo que ya
+  /// cargó el usuario o la otra foto.
+  void _applyOcrValues(OcrPhotoResult result, {required bool primaryIsPrice}) {
+    final price = result.extractedPrice;
+    if (price != null && (primaryIsPrice || _priceController.text.isEmpty)) {
+      _priceController.text = formatWithDots(price.toStringAsFixed(0));
+      _priceFromOcr = true;
+    }
+    final liters = result.extractedLiters;
+    if (liters != null && (!primaryIsPrice || _litersController.text.isEmpty)) {
+      _litersController.text = formatLitersAr(liters);
+      _litersFromOcr = true;
+    }
+  }
+
   Future<void> _attemptClose() async {
     if (_hasChanges) {
       final discard = await confirmDelete(
@@ -204,10 +221,7 @@ class _FuelChargeFormSheetState extends ConsumerState<FuelChargeFormSheet> {
                             _receiptPhotoPublicId = result.cloudinaryPublicId;
                             _receiptIsPdf = result.isPdf;
                             _receiptFileName = result.fileName;
-                            if (result.extractedValue != null) {
-                              _priceController.text = formatWithDots(result.extractedValue!.toStringAsFixed(0));
-                              _priceFromOcr = true;
-                            }
+                            _applyOcrValues(result, primaryIsPrice: true);
                           });
                         },
                       ),
@@ -224,13 +238,7 @@ class _FuelChargeFormSheetState extends ConsumerState<FuelChargeFormSheet> {
                             _displayPhotoPublicId = result.cloudinaryPublicId;
                             _displayIsPdf = result.isPdf;
                             _displayFileName = result.fileName;
-                            if (result.extractedValue != null) {
-                              _litersController.text = result
-                                  .extractedValue!
-                                  .toStringAsFixed(2)
-                                  .replaceAll('.', ',');
-                              _litersFromOcr = true;
-                            }
+                            _applyOcrValues(result, primaryIsPrice: false);
                           });
                         },
                       ),
