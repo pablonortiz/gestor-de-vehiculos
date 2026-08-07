@@ -22,7 +22,7 @@ class MaintenanceRepository with SyncableRepository {
   // que no hacen falta para el costo).
   Future<List<Maintenance>> getAllMaintenances() async {
     final db = await _dbHelper.database;
-    final maps = await db.query('maintenances', orderBy: 'date DESC');
+    final maps = await db.query('maintenances', orderBy: 'date DESC, created_at DESC');
     return maps.map((map) => Maintenance.fromMap(map)).toList();
   }
 
@@ -33,7 +33,7 @@ class MaintenanceRepository with SyncableRepository {
       'maintenances',
       where: 'vehicle_id = ?',
       whereArgs: [vehicleId],
-      orderBy: 'date DESC',
+      orderBy: 'date DESC, created_at DESC',
     );
     if (maps.isEmpty) return [];
 

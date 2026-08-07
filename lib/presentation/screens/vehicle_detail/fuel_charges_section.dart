@@ -99,7 +99,7 @@ class _FuelChargesSectionState extends ConsumerState<_FuelChargesSection> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '${charge.liters.toStringAsFixed(1)} L',
+                        AppFormats.liters(charge.liters),
                         style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,

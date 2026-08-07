@@ -6,6 +6,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import '../../core/constants/provinces.dart';
+import '../../core/utils/formatters.dart';
 import '../../core/constants/vehicle_constants.dart';
 import '../../domain/models/vehicle.dart';
 import '../../domain/models/vehicle_photo.dart';
@@ -1101,10 +1102,10 @@ class PdfService {
                 // Summary stats
                 _buildSection('RESUMEN DEL PERIODO', [
                   _buildInfoRow('Total de cargas', stats.sortedCharges.length.toString()),
-                  _buildInfoRow('Litros totales', '${stats.totalLiters.toStringAsFixed(1)} L'),
+                  _buildInfoRow('Litros totales', AppFormats.liters(stats.totalLiters)),
                   _buildInfoRow('Gasto total', currencyFormat.format(stats.totalPrice)),
                   _buildInfoRow('Precio promedio por litro', '${currencyFormat.format(stats.avgPricePerLiter)}/L'),
-                  _buildInfoRow('Promedio de litros por carga', '${stats.avgLitersPerCharge.toStringAsFixed(1)} L'),
+                  _buildInfoRow('Promedio de litros por carga', AppFormats.liters(stats.avgLitersPerCharge)),
                   if (stats.avgKmBetweenCharges != null)
                     _buildInfoRow('Promedio de km entre cargas', stats.avgKmBetweenCharges!),
                 ]),
@@ -1239,7 +1240,7 @@ class PdfService {
                       child: pw.Row(
                         children: [
                           _tableCell(dateFormat.format(charge.date), 70),
-                          _tableCell('${charge.liters.toStringAsFixed(1)} L', 55),
+                          _tableCell(AppFormats.liters(charge.liters), 55),
                           _tableCell(currencyFormat.format(charge.price), 65),
                           _tableCell('${currencyFormat.format(charge.calculatedPricePerLiter)}/L', 55),
                           _tableCell(

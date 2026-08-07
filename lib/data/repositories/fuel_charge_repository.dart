@@ -25,7 +25,7 @@ class FuelChargeRepository with SyncableRepository {
       'fuel_charges',
       where: 'vehicle_id = ?',
       whereArgs: [vehicleId],
-      orderBy: 'date DESC',
+      orderBy: 'date DESC, created_at DESC',
     );
     return maps.map((map) => FuelCharge.fromMap(map)).toList();
   }
@@ -33,7 +33,7 @@ class FuelChargeRepository with SyncableRepository {
   // Todas las cargas (para el dashboard de gastos consolidado).
   Future<List<FuelCharge>> getAllFuelCharges() async {
     final db = await _dbHelper.database;
-    final maps = await db.query('fuel_charges', orderBy: 'date DESC');
+    final maps = await db.query('fuel_charges', orderBy: 'date DESC, created_at DESC');
     return maps.map((map) => FuelCharge.fromMap(map)).toList();
   }
 
@@ -55,7 +55,7 @@ class FuelChargeRepository with SyncableRepository {
         startOfMonth.millisecondsSinceEpoch,
         endOfMonth.millisecondsSinceEpoch,
       ],
-      orderBy: 'date DESC',
+      orderBy: 'date DESC, created_at DESC',
     );
     return maps.map((map) => FuelCharge.fromMap(map)).toList();
   }
@@ -75,7 +75,7 @@ class FuelChargeRepository with SyncableRepository {
         startDate.millisecondsSinceEpoch,
         endDate.millisecondsSinceEpoch,
       ],
-      orderBy: 'date DESC',
+      orderBy: 'date DESC, created_at DESC',
     );
     return maps.map((map) => FuelCharge.fromMap(map)).toList();
   }
@@ -271,7 +271,7 @@ class FuelChargeRepository with SyncableRepository {
       'fuel_charges',
       where: 'vehicle_id = ?',
       whereArgs: [vehicleId],
-      orderBy: 'date DESC',
+      orderBy: 'date DESC, created_at DESC',
       limit: limit,
     );
     return maps.map((map) => FuelCharge.fromMap(map)).toList();

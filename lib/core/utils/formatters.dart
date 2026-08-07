@@ -1,6 +1,6 @@
 import 'package:intl/intl.dart';
 
-/// Formateo de números en convención es_AR: "$ 1.234.567", "194.571 km", "23,5 L".
+/// Formateo de números en convención es_AR: "$ 1.234.567", "194.571 km", "23,562 L".
 class AppFormats {
   AppFormats._();
 
@@ -13,7 +13,8 @@ class AppFormats {
     customPattern: '¤ #,##0',
   );
   static final NumberFormat _integer = NumberFormat.decimalPattern('es_AR');
-  static final NumberFormat _liters = NumberFormat('#,##0.##', 'es_AR');
+  // 3 decimales: es lo que muestra el surtidor (28,605 L).
+  static final NumberFormat _liters = NumberFormat('#,##0.###', 'es_AR');
 
   static String money(num value) => _money.format(value);
 

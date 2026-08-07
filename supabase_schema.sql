@@ -126,7 +126,7 @@ CREATE TABLE IF NOT EXISTS fuel_charges (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   vehicle_id UUID NOT NULL REFERENCES vehicles(id) ON DELETE CASCADE,
   date TIMESTAMPTZ NOT NULL,
-  liters DECIMAL(10,2) NOT NULL,
+  liters DECIMAL(10,3) NOT NULL,
   price DECIMAL(12,2) NOT NULL,
   price_per_liter DECIMAL(10,2),
   odometer INTEGER,

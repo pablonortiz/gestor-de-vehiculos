@@ -1,3 +1,5 @@
+import '../../core/utils/civil_date.dart';
+
 class FuelCharge {
   /// Techo plausible de litros por carga. Sobre este valor casi seguro se
   /// tipearon los litros del surtidor sin el separador decimal (23.562 → 23562).
@@ -89,7 +91,7 @@ class FuelCharge {
     return {
       if (id != null) 'id': id,
       'vehicle_id': vehicleId,
-      'date': date.toIso8601String(),
+      'date': CivilDate.toSupabase(date),
       'liters': liters,
       'price': price,
       'price_per_liter': calculatedPricePerLiter,
@@ -110,7 +112,7 @@ class FuelCharge {
     return FuelCharge(
       id: map['id'] as String,
       vehicleId: map['vehicle_id'] as String,
-      date: DateTime.parse(map['date'] as String),
+      date: CivilDate.fromSupabase(map['date'] as String),
       liters: (map['liters'] as num).toDouble(),
       price: (map['price'] as num).toDouble(),
       odometer: map['odometer'] as int?,

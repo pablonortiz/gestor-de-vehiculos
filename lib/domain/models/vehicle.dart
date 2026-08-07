@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/vehicle_constants.dart';
+import '../../core/utils/civil_date.dart';
 import '../../core/utils/enum_parser.dart';
 
 class Vehicle {
@@ -173,9 +174,9 @@ class Vehicle {
       'year': year,
       'color': color.toARGB32(),
       'km': km,
-      'vtv_expiry': vtvExpiry?.toIso8601String(),
+      'vtv_expiry': CivilDate.toSupabaseOrNull(vtvExpiry),
       'insurance_company': insuranceCompany,
-      'insurance_expiry': insuranceExpiry?.toIso8601String(),
+      'insurance_expiry': CivilDate.toSupabaseOrNull(insuranceExpiry),
       'fuel_type': fuelType.index,
       'status': status.index,
       'province_id': provinceId,
@@ -198,13 +199,9 @@ class Vehicle {
       year: map['year'] as int,
       color: Color(map['color'] as int),
       km: map['km'] as int,
-      vtvExpiry: map['vtv_expiry'] != null
-          ? DateTime.parse(map['vtv_expiry'] as String)
-          : null,
+      vtvExpiry: CivilDate.fromSupabaseOrNull(map['vtv_expiry']),
       insuranceCompany: map['insurance_company'] as String?,
-      insuranceExpiry: map['insurance_expiry'] != null
-          ? DateTime.parse(map['insurance_expiry'] as String)
-          : null,
+      insuranceExpiry: CivilDate.fromSupabaseOrNull(map['insurance_expiry']),
       fuelType: enumFromIndex(FuelType.values, map['fuel_type'], FuelType.nafta),
       status:
           enumFromIndex(VehicleStatus.values, map['status'], VehicleStatus.available),

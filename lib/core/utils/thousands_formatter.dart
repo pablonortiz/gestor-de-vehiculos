@@ -23,7 +23,8 @@ String formatLitersAr(double value) {
 /// Para campos decimales (ej. litros): el "." se retransforma a "," al tipear.
 /// En una carga nunca van miles de litros, así que un punto solo puede querer
 /// decir separador decimal — se muestra en convención es_AR en vez de castigar
-/// después con un error. Admite una sola coma y solo dígitos.
+/// después con un error. Admite una sola coma, solo dígitos y hasta 3 decimales
+/// (la precisión del surtidor).
 class DecimalCommaFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(
@@ -31,7 +32,7 @@ class DecimalCommaFormatter extends TextInputFormatter {
     TextEditingValue newValue,
   ) {
     final text = newValue.text.replaceAll('.', ',');
-    if (RegExp(r'^[0-9]*,?[0-9]*$').hasMatch(text)) {
+    if (RegExp(r'^[0-9]*(,[0-9]{0,3})?$').hasMatch(text)) {
       return newValue.copyWith(text: text);
     }
     return oldValue;

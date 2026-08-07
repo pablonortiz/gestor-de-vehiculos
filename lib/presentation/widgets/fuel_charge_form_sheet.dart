@@ -53,7 +53,7 @@ class _FuelChargeFormSheetState extends ConsumerState<FuelChargeFormSheet> {
     super.initState();
     _selectedDate = widget.existing?.date ?? DateTime.now();
     _litersController = TextEditingController(
-      text: widget.existing?.liters.toString().replaceAll('.', ',') ?? '',
+      text: widget.existing != null ? formatLitersAr(widget.existing!.liters) : '',
     );
     _priceController = TextEditingController(
       text: widget.existing != null
@@ -252,7 +252,7 @@ class _FuelChargeFormSheetState extends ConsumerState<FuelChargeFormSheet> {
                   controller: _litersController,
                   decoration: InputDecoration(
                     labelText: 'Litros *',
-                    hintText: 'Ej: 23,5',
+                    hintText: 'Ej: 23,562',
                     suffixText: 'L',
                     suffixIcon: _litersFromOcr
                         ? const Icon(Icons.check_circle, color: AppTheme.success, size: 20)

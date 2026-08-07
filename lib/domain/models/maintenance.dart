@@ -1,3 +1,4 @@
+import '../../core/utils/civil_date.dart';
 import '../../core/utils/enum_parser.dart';
 
 class Maintenance {
@@ -48,7 +49,7 @@ class Maintenance {
     return {
       if (id != null) 'id': id,
       'vehicle_id': vehicleId,
-      'date': date.toIso8601String(),
+      'date': CivilDate.toSupabase(date),
       'detail': detail,
       'cost': cost,
     };
@@ -58,7 +59,7 @@ class Maintenance {
     return Maintenance(
       id: map['id'] as String,
       vehicleId: map['vehicle_id'] as String,
-      date: DateTime.parse(map['date'] as String),
+      date: CivilDate.fromSupabase(map['date'] as String),
       detail: map['detail'] as String,
       cost: (map['cost'] as num?)?.toDouble(),
       invoices: invoices ?? [],
