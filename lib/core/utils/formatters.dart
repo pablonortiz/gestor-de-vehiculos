@@ -13,8 +13,9 @@ class AppFormats {
     customPattern: '¤ #,##0',
   );
   static final NumberFormat _integer = NumberFormat.decimalPattern('es_AR');
-  // 3 decimales: es lo que muestra el surtidor (28,605 L).
-  static final NumberFormat _liters = NumberFormat('#,##0.###', 'es_AR');
+  // Siempre 3 decimales: es la precisión que muestra el surtidor. Mantener
+  // también los ceros finales evita que 240,320 L se vea como 240,32 L.
+  static final NumberFormat _liters = NumberFormat('#,##0.000', 'es_AR');
 
   static String money(num value) => _money.format(value);
 

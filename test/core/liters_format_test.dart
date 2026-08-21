@@ -5,29 +5,34 @@ import 'package:gestor_vehiculos/core/utils/thousands_formatter.dart';
 
 String _typed(String previous, String next) {
   final result = DecimalCommaFormatter().formatEditUpdate(
-    TextEditingValue(text: previous, selection: TextSelection.collapsed(offset: previous.length)),
-    TextEditingValue(text: next, selection: TextSelection.collapsed(offset: next.length)),
+    TextEditingValue(
+      text: previous,
+      selection: TextSelection.collapsed(offset: previous.length),
+    ),
+    TextEditingValue(
+      text: next,
+      selection: TextSelection.collapsed(offset: next.length),
+    ),
   );
   return result.text;
 }
 
 void main() {
   group('AppFormats.liters', () {
-    test('muestra los 3 decimales del surtidor', () {
+    test('muestra siempre los 3 decimales del surtidor', () {
       expect(AppFormats.liters(28.605), '28,605 L');
-    });
-
-    test('no rellena con ceros de cola', () {
-      expect(AppFormats.liters(45.5), '45,5 L');
-      expect(AppFormats.liters(45), '45 L');
+      expect(AppFormats.liters(240.320), '240,320 L');
+      expect(AppFormats.liters(45.5), '45,500 L');
+      expect(AppFormats.liters(45), '45,000 L');
     });
   });
 
   group('formatLitersAr', () {
-    test('convierte a coma y conserva 3 decimales', () {
+    test('convierte a coma y muestra siempre 3 decimales', () {
       expect(formatLitersAr(28.605), '28,605');
-      expect(formatLitersAr(45.5), '45,5');
-      expect(formatLitersAr(45), '45');
+      expect(formatLitersAr(240.320), '240,320');
+      expect(formatLitersAr(45.5), '45,500');
+      expect(formatLitersAr(45), '45,000');
     });
   });
 

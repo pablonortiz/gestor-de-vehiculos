@@ -13,11 +13,10 @@ String formatWithDots(String digits) {
   return buffer.toString();
 }
 
-/// Formatea litros en convención es_AR: hasta 3 decimales (lo que muestra el
-/// surtidor), sin ceros de cola. 28.605 → "28,605"; 45.5 → "45,5"; 45.0 → "45".
+/// Formatea litros en convención es_AR con los 3 decimales que muestra el
+/// surtidor. 28.605 → "28,605"; 45.5 → "45,500"; 45.0 → "45,000".
 String formatLitersAr(double value) {
-  final s = value.toStringAsFixed(3).replaceFirst(RegExp(r'\.?0+$'), '');
-  return s.replaceAll('.', ',');
+  return value.toStringAsFixed(3).replaceAll('.', ',');
 }
 
 /// Para campos decimales (ej. litros): el "." se retransforma a "," al tipear.
